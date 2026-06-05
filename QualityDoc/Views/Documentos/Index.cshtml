@@ -1,0 +1,116 @@
+@using Microsoft.AspNetCore.Mvc.Rendering
+@model List<QualityDoc.Models.Domain.DocumentoVersion>
+@{
+    ViewData["Title"] = "Documentos";
+    var areas = ViewBag.Areas as List<SelectListItem>;
+    var q = ViewBag.Q as string;
+    var areaId = ViewBag.AreaId as int?;
+    var tipo = ViewBag.Tipo as string;
+    int page = ViewBag.Page ?? 1;
+    int totalPages = ViewBag.TotalPages ?? 1;
+    bool puedeEditar = User.IsInRole("SUPERADMIN") || User.IsInRole("ADMIN") || User.IsInRole("REVISOR") || User.IsInRole("CREADOR");
+}
+@functions {
+    static string Badge(string estado) => estado switch
+    {
+        "APROBADO" => "success",
+        "EN_REVISION" => "warning text-dark",
+        "BORRADOR" => "secondary",
+        "RECHAZADO" => "danger",
+        "OBSOLETO" => "dark",
+        _ => "light text-dark"
+    };
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Documentos</h3>
+    @if (puedeEditar)
+    {
+        <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg"></i> Nuevo documento</a>
+    }
+</div>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-4">
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input name="q" value="@q" class="form-control" placeholder="Buscar (título, etiquetas…) — MongoDB" />
+        </div>
+    </div>
+    <div class="col-md-3">
+        <select name="areaId" class="form-select" asp-items="areas">
+            <option value="">— Todas las áreas —</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <input name="tipo" value="@tipo" class="form-control" placeholder="Tipo (pdf, docx…)" />
+    </div>
+    <div class="col-md-2">
+        <button class="btn btn-outline-primary w-100">Filtrar</button>
+    </div>
+    @if (!string.IsNullOrEmpty(q) || areaId != null || !string.IsNullOrEmpty(tipo))
+    {
+        <div class="col-md-1">
+            <a asp-action="Index" class="btn btn-outline-secondary w-100" title="Limpiar"><i class="bi bi-x-lg"></i></a>
+        </div>
+    }
+</form>
+
+@if (ViewBag.SoloVigentes == true)
+{
+    <p class="text-muted small">Mostrando solo documentos <strong>vigentes</strong> (aprobados).</p>
+}
+@if (!string.IsNullOrEmpty(q))
+{
+    <p class="text-muted small">Resultados de búsqueda en MongoDB para: <strong>@q</strong> (@ViewBag.Total)</p>
+}
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle bg-white">
+        <thead class="table-light">
+            <tr>
+                <th>Título</th><th>Área</th><th>Versión</th><th>Estado</th><th>Tipo</th><th>Actualizado</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @if (!Model.Any())
+        {
+            <tr><td colspan="7" class="text-center text-muted py-4">No hay documentos.</td></tr>
+        }
+        @foreach (var v in Model)
+        {
+            <tr>
+                <td><a asp-action="Details" asp-route-id="@v.DocumentoId">@v.Documento?.Titulo</a></td>
+                <td>@v.Documento?.Area?.Nombre</td>
+                <td><span class="badge bg-light text-dark border">@v.VersionTag</span>@(v.EsVigente ? " ✓" : "")</td>
+                <td><span class="badge bg-@Badge(v.Estado)">@v.Estado</span></td>
+                <td>@v.TipoArchivo</td>
+                <td class="small text-muted">@v.CreadoEn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                <td class="text-end">
+                    <a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@v.DocumentoId">Detalle</a>
+                    @if (v.RutaArchivo != null)
+                    {
+                        <a class="btn btn-sm btn-outline-primary" asp-action="Download" asp-route-versionId="@v.Id">
+                            <i class="bi bi-download"></i>
+                        </a>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+@if (totalPages > 1)
+{
+    <nav>
+        <ul class="pagination pagination-sm">
+            @for (int p = 1; p <= totalPages; p++)
+            {
+                <li class="page-item @(p == page ? "active" : "")">
+                    <a class="page-link" asp-action="Index" asp-route-q="@q" asp-route-areaId="@areaId" asp-route-tipo="@tipo" asp-route-page="@p">@p</a>
+                </li>
+            }
+        </ul>
+    </nav>
+}

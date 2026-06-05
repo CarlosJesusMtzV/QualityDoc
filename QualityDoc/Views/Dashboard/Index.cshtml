@@ -1,0 +1,69 @@
+@{
+    ViewData["Title"] = "Panel";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Panel</h3>
+    <a class="btn btn-primary" asp-controller="Documentos" asp-action="Index">
+        <i class="bi bi-folder2-open"></i> Ver documentos
+    </a>
+</div>
+
+<div class="row g-3">
+    @{
+        var tarjetas = new (string Titulo, object Valor, string Color, string Icono)[]
+        {
+            ("Documentos", ViewBag.TotalDocumentos, "primary", "bi-files"),
+            ("Vigentes", ViewBag.Vigentes, "success", "bi-check-circle"),
+            ("En revisión", ViewBag.EnRevision, "warning", "bi-hourglass-split"),
+            ("Borradores", ViewBag.Borradores, "secondary", "bi-pencil"),
+            ("Rechazados", ViewBag.Rechazados, "danger", "bi-x-circle"),
+            ("Obsoletos", ViewBag.Obsoletos, "dark", "bi-archive"),
+        };
+    }
+    @foreach (var t in tarjetas)
+    {
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="card text-center h-100 border-@t.Color">
+                <div class="card-body">
+                    <i class="bi @t.Icono fs-3 text-@t.Color"></i>
+                    <div class="fs-3 fw-bold">@t.Valor</div>
+                    <div class="small text-muted">@t.Titulo</div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card"><div class="card-body">
+            <h6 class="card-title text-muted">Versiones por estado</h6>
+            <canvas id="estadoChart" height="180"></canvas>
+        </div></div>
+    </div>
+</div>
+
+@if (ViewBag.EsAdmin == true)
+{
+    <div class="alert alert-info mt-4 small mb-0">
+        Como administrador puedes gestionar <strong>usuarios y áreas</strong> y revisar la <strong>auditoría</strong> desde el menú superior.
+    </div>
+}
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script>
+        new Chart(document.getElementById('estadoChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Vigentes', 'En revisión', 'Borradores', 'Rechazados', 'Obsoletos'],
+                datasets: [{
+                    data: [@ViewBag.Vigentes, @ViewBag.EnRevision, @ViewBag.Borradores, @ViewBag.Rechazados, @ViewBag.Obsoletos],
+                    backgroundColor: ['#198754', '#ffc107', '#6c757d', '#dc3545', '#212529']
+                }]
+            },
+            options: { plugins: { legend: { position: 'right' } } }
+        });
+    </script>
+}

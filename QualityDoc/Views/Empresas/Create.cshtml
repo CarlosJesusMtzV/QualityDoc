@@ -1,0 +1,44 @@
+@model QualityDoc.Models.ViewModels.EmpresaCreateViewModel
+@{ ViewData["Title"] = "Nueva empresa"; }
+
+<h3 class="mb-3">Nueva empresa</h3>
+<div class="card shadow-sm"><div class="card-body">
+    <form asp-action="Create" method="post">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Nombre</label>
+                <input asp-for="Nombre" class="form-control" />
+                <span asp-validation-for="Nombre" class="text-danger small"></span>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Slug (identificador)</label>
+                <input asp-for="Slug" class="form-control" placeholder="empresa-abc" />
+                <span asp-validation-for="Slug" class="text-danger small"></span>
+            </div>
+        </div>
+        <hr />
+        <p class="text-muted small mb-2">Administrador inicial de la empresa</p>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Nombre del admin</label>
+                <input asp-for="AdminNombre" class="form-control" />
+                <span asp-validation-for="AdminNombre" class="text-danger small"></span>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Correo del admin</label>
+                <input asp-for="AdminEmail" class="form-control" />
+                <span asp-validation-for="AdminEmail" class="text-danger small"></span>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Contraseña del admin</label>
+                <input asp-for="AdminPassword" type="password" class="form-control" />
+                <span asp-validation-for="AdminPassword" class="text-danger small"></span>
+            </div>
+        </div>
+        <div class="mt-3">
+            <button class="btn btn-primary"><i class="bi bi-save"></i> Crear empresa</button>
+            <a asp-action="Index" class="btn btn-outline-secondary">Cancelar</a>
+        </div>
+    </form>
+</div></div>

@@ -1,0 +1,244 @@
+@model QualityDoc.Models.Domain.Documento
+@{
+    ViewData["Title"] = Model.Titulo;
+    var versiones = Model.Versiones.ToList();
+    var latest = versiones.FirstOrDefault();
+    bool puedeEditar  = User.IsInRole("SUPERADMIN") || User.IsInRole("ADMIN") || User.IsInRole("REVISOR") || User.IsInRole("CREADOR");
+    bool puedeAprobar = User.IsInRole("SUPERADMIN") || User.IsInRole("ADMIN") || User.IsInRole("REVISOR");
+}
+@functions {
+    static string Badge(string estado) => estado switch
+    {
+        "APROBADO" => "success",
+        "EN_REVISION" => "warning text-dark",
+        "BORRADOR" => "secondary",
+        "RECHAZADO" => "danger",
+        "OBSOLETO" => "dark",
+        _ => "light text-dark"
+    };
+}
+
+<a asp-action="Index" class="small text-decoration-none">&larr; Documentos</a>
+
+<div class="d-flex justify-content-between align-items-start mt-1 mb-3">
+    <div>
+        <h3 class="mb-1">@Model.Titulo</h3>
+        <div class="text-muted small">
+            Área: <strong>@Model.Area?.Nombre</strong> ·
+            Creado por: @Model.CreadoPor?.NombreCompleto ·
+            @Model.CreadoEn.ToLocalTime().ToString("yyyy-MM-dd")
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Model.Descripcion))
+        {
+            <p class="mt-2 mb-0">@Model.Descripcion</p>
+        }
+    </div>
+    <div class="text-nowrap">
+        @if (puedeEditar)
+        {
+            <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.Id">
+                <i class="bi bi-pencil"></i> Editar
+            </a>
+        }
+        @if (User.IsInRole("SUPERADMIN") || User.IsInRole("ADMIN"))
+        {
+            <form asp-action="Eliminar" method="post" class="d-inline" onsubmit="return confirm('¿Dar de baja este documento?');">
+                <input type="hidden" name="id" value="@Model.Id" />
+                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Dar de baja</button>
+            </form>
+        }
+    </div>
+</div>
+
+@* ── Versión de trabajo + acciones del flujo ── *@
+@if (latest != null)
+{
+    <div class="card shadow-sm mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Versión de trabajo: <strong>@latest.VersionTag</strong>
+                <span class="badge bg-@Badge(latest.Estado) ms-1">@latest.Estado</span>
+                @if (latest.EsVigente) { <span class="badge bg-success ms-1">VIGENTE</span> }
+            </span>
+            @if (latest.RutaArchivo != null)
+            {
+                <a class="btn btn-sm btn-outline-primary" asp-action="Download" asp-route-versionId="@latest.Id">
+                    <i class="bi bi-download"></i> @latest.NombreArchivo
+                </a>
+            }
+        </div>
+        <div class="card-body">
+            @if (latest.Estado == "BORRADOR" && puedeEditar)
+            {
+                <form asp-action="SubirArchivo" method="post" enctype="multipart/form-data" class="row g-2 align-items-end mb-3">
+                    <input type="hidden" name="versionId" value="@latest.Id" />
+                    <input type="hidden" name="documentoId" value="@Model.Id" />
+                    <div class="col-md-7">
+                        <label class="form-label small mb-0">Reemplazar / subir archivo</label>
+                        <input type="file" name="archivo" class="form-control" />
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-outline-secondary w-100"><i class="bi bi-upload"></i> Guardar archivo</button>
+                    </div>
+                </form>
+                <form asp-action="EnviarRevision" method="post" onsubmit="return confirm('¿Enviar a revisión?');">
+                    <input type="hidden" name="versionId" value="@latest.Id" />
+                    <input type="hidden" name="documentoId" value="@Model.Id" />
+                    <button class="btn btn-warning"><i class="bi bi-send"></i> Enviar a revisión</button>
+                </form>
+            }
+            else if (latest.Estado == "EN_REVISION" && puedeAprobar)
+            {
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <form asp-action="Aprobar" method="post">
+                            <input type="hidden" name="versionId" value="@latest.Id" />
+                            <input type="hidden" name="documentoId" value="@Model.Id" />
+                            <label class="form-label small">Comentario (opcional)</label>
+                            <textarea name="comentario" class="form-control mb-2" rows="2"></textarea>
+                            <button class="btn btn-success w-100"><i class="bi bi-check-lg"></i> Aprobar (→ versión mayor, vigente)</button>
+                        </form>
+                    </div>
+                    <div class="col-md-6">
+                        <form asp-action="Rechazar" method="post">
+                            <input type="hidden" name="versionId" value="@latest.Id" />
+                            <input type="hidden" name="documentoId" value="@Model.Id" />
+                            <label class="form-label small">Tipo de cambio</label>
+                            <select name="tipoRechazo" class="form-select mb-2">
+                                <option value="MENOR">Menor (patch +1)</option>
+                                <option value="MAYOR">Mayor (minor +1)</option>
+                            </select>
+                            <textarea name="comentario" class="form-control mb-2" rows="1" placeholder="Motivo"></textarea>
+                            <button class="btn btn-danger w-100"><i class="bi bi-x-lg"></i> Rechazar (genera nueva versión)</button>
+                        </form>
+                    </div>
+                </div>
+            }
+            else if (latest.Estado == "EN_REVISION")
+            {
+                <span class="text-muted">En revisión. Un revisor o admin debe aprobar o rechazar.</span>
+            }
+            else
+            {
+                <span class="text-muted">Sin acciones pendientes para tu rol.</span>
+            }
+        </div>
+    </div>
+}
+
+@* ── Historial completo de versiones (paginado) ── *@
+@{
+    int hpage = 1;
+    int.TryParse(Context.Request.Query["hpage"], out hpage);
+    if (hpage < 1) hpage = 1;
+    const int hsize = 10;
+    int totalH = versiones.Count;
+    int totalHPages = (int)Math.Ceiling(totalH / (double)hsize);
+    var histItems = versiones.Skip((hpage - 1) * hsize).Take(hsize).ToList();
+}
+<h5>Historial de versiones <span class="text-muted small">(@totalH)</span></h5>
+<div class="table-responsive">
+    <table class="table table-sm table-striped align-middle bg-white">
+        <thead class="table-light">
+            <tr><th>Versión</th><th>Estado</th><th>Tipo</th><th>Subido por</th><th>Fecha</th><th>Comentario</th><th></th></tr>
+        </thead>
+        <tbody>
+        @foreach (var v in histItems)
+        {
+            <tr>
+                <td>
+                    <span class="badge bg-light text-dark border">@v.VersionTag</span>
+                    @if (v.EsVigente) { <span class="badge bg-success">vigente</span> }
+                    @if (v.Estado == "OBSOLETO" && v.FueAprobada) { <span class="badge bg-secondary">aprobada antes</span> }
+                </td>
+                <td><span class="badge bg-@Badge(v.Estado)">@v.Estado</span></td>
+                <td>@v.TipoArchivo</td>
+                <td class="small">@v.SubidoPor?.NombreCompleto</td>
+                <td class="small text-muted">@v.CreadoEn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                <td class="small">@v.ComentarioRevision</td>
+                <td class="text-end text-nowrap">
+                    @if (v.RutaArchivo != null)
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-info" onclick="verMetadatos(@v.Id)" title="Ver metadatos">
+                            <i class="bi bi-info-circle"></i>
+                        </button>
+                        <a class="btn btn-sm btn-outline-primary" asp-action="Download" asp-route-versionId="@v.Id" title="Descargar (app)">
+                            <i class="bi bi-download"></i>
+                        </a>
+                        var nginxBase = ViewBag.NginxBase as string;
+                        if (!string.IsNullOrEmpty(nginxBase))
+                        {
+                            <a class="btn btn-sm btn-outline-success" target="_blank" title="Abrir vía Nginx"
+                               href="@(nginxBase.TrimEnd('/'))/@v.RutaArchivo">
+                                <i class="bi bi-hdd-network"></i>
+                            </a>
+                        }
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+@if (totalHPages > 1)
+{
+    <nav>
+        <ul class="pagination pagination-sm">
+            @for (int p = 1; p <= totalHPages; p++)
+            {
+                <li class="page-item @(p == hpage ? "active" : "")">
+                    <a class="page-link" asp-action="Details" asp-route-id="@Model.Id" asp-route-hpage="@p">@p</a>
+                </li>
+            }
+        </ul>
+    </nav>
+}
+
+@* ── Modal de metadatos (se cargan en vivo desde MongoDB) ── *@
+<div class="modal fade" id="metaModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-info-circle text-info"></i> Metadatos (en vivo desde MongoDB)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="metaBody"><div class="text-center text-muted py-3">Cargando…</div></div>
+                <h6 class="text-muted small mt-3">JSON almacenado en Mongo</h6>
+                <pre id="metaJson" class="bg-light p-2 small rounded" style="max-height:240px;overflow:auto"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function verMetadatos(versionId) {
+            document.getElementById('metaBody').innerHTML = '<div class="text-center text-muted py-3">Cargando…</div>';
+            document.getElementById('metaJson').textContent = '';
+            new bootstrap.Modal(document.getElementById('metaModal')).show();
+
+            fetch('@Url.Action("Metadatos", "Documentos")?versionId=' + versionId)
+                .then(r => r.json())
+                .then(d => {
+                    let rows = '';
+                    rows += `<tr><th style="width:160px">Archivo</th><td>${d.archivo ?? ''}</td></tr>`;
+                    rows += `<tr><th>Versión</th><td>${d.version ?? ''}</td></tr>`;
+                    rows += `<tr><th>Tipo</th><td>${d.tipo ?? ''}</td></tr>`;
+                    rows += `<tr><th>Tamaño</th><td>${(d.tamanioBytes ?? 0).toLocaleString()} bytes</td></tr>`;
+                    rows += `<tr><th>Estado</th><td>${d.estado ?? ''}</td></tr>`;
+                    if (d.nginxUrl) rows += `<tr><th>URL Nginx</th><td><a href="${d.nginxUrl}" target="_blank">${d.nginxUrl}</a></td></tr>`;
+                    for (const k in (d.metadatos || {})) {
+                        rows += `<tr><th>${k}</th><td>${d.metadatos[k]}</td></tr>`;
+                    }
+                    document.getElementById('metaBody').innerHTML =
+                        '<table class="table table-sm table-striped mb-0"><tbody>' + rows + '</tbody></table>';
+                    document.getElementById('metaJson').textContent = JSON.stringify(d.metadatos || {}, null, 2);
+                })
+                .catch(() => {
+                    document.getElementById('metaBody').innerHTML =
+                        '<div class="alert alert-danger">No se pudieron cargar los metadatos.</div>';
+                });
+        }
+    </script>
+}

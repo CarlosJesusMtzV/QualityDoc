@@ -1,0 +1,43 @@
+@model QualityDoc.Models.ViewModels.DocumentoCreateViewModel
+@{
+    ViewData["Title"] = "Nuevo documento";
+}
+
+<h3 class="mb-3">Nuevo documento</h3>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form asp-action="Create" method="post" enctype="multipart/form-data">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="mb-3">
+                <label class="form-label">Título</label>
+                <input asp-for="Titulo" class="form-control" />
+                <span asp-validation-for="Titulo" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Descripción</label>
+                <textarea asp-for="Descripcion" class="form-control" rows="2"></textarea>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Área</label>
+                <select asp-for="AreaId" asp-items="Model.Areas" class="form-select">
+                    <option value="">— Selecciona —</option>
+                </select>
+                <span asp-validation-for="AreaId" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Archivo</label>
+                <input asp-for="Archivo" type="file" class="form-control" />
+                <span asp-validation-for="Archivo" class="text-danger small"></span>
+                <div class="form-text">PDF, DOCX, XLSX, imágenes, planos… Se guardará como versión v1.0.0 (BORRADOR).</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Crear documento</button>
+            <a asp-action="Index" class="btn btn-outline-secondary">Cancelar</a>
+        </form>
+    </div>
+</div>

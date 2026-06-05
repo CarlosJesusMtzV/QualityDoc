@@ -1,0 +1,40 @@
+@model QualityDoc.Models.ViewModels.LoginViewModel
+@{
+    ViewData["Title"] = "Iniciar sesión";
+    var returnUrl = ViewData["ReturnUrl"] as string;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-5 col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h4 class="mb-3"><i class="bi bi-box-arrow-in-right text-primary"></i> Iniciar sesión</h4>
+
+                @if (!string.IsNullOrEmpty(Model.Error))
+                {
+                    <div class="alert alert-danger py-2">@Model.Error</div>
+                }
+
+                <form asp-action="Login" method="post">
+                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                    <div class="mb-3">
+                        <label class="form-label">Correo</label>
+                        <input asp-for="Email" class="form-control" autofocus />
+                        <span asp-validation-for="Email" class="text-danger small"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contraseña</label>
+                        <input asp-for="Password" type="password" class="form-control" />
+                        <span asp-validation-for="Password" class="text-danger small"></span>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Entrar</button>
+                </form>
+
+                <hr />
+                <p class="small text-muted mb-0">
+                    Demo: <code>admin@empresa-demo.com</code> · contraseña <code>QualityDoc2026!</code>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>

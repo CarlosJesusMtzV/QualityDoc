@@ -1,0 +1,20 @@
+@model QualityDoc.Models.ViewModels.AreaCreateViewModel
+@{ ViewData["Title"] = "Nueva área"; }
+
+<h3 class="mb-3">Nueva área</h3>
+<div class="card shadow-sm"><div class="card-body">
+    <form asp-action="Create" method="post">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+        <div class="mb-3">
+            <label class="form-label">Nombre</label>
+            <input asp-for="Nombre" class="form-control" />
+            <span asp-validation-for="Nombre" class="text-danger small"></span>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Descripción</label>
+            <textarea asp-for="Descripcion" class="form-control" rows="2"></textarea>
+        </div>
+        <button class="btn btn-primary"><i class="bi bi-save"></i> Crear área</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">Cancelar</a>
+    </form>
+</div></div>

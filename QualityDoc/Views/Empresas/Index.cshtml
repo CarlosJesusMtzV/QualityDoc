@@ -1,0 +1,22 @@
+@model List<QualityDoc.Models.Domain.Empresa>
+@{ ViewData["Title"] = "Empresas"; }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Empresas</h3>
+    <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg"></i> Nueva empresa</a>
+</div>
+
+<table class="table table-hover bg-white align-middle">
+    <thead class="table-light"><tr><th>Nombre</th><th>Slug</th><th>Activa</th><th>Creada</th></tr></thead>
+    <tbody>
+    @foreach (var e in Model)
+    {
+        <tr>
+            <td>@e.Nombre</td>
+            <td><code>@e.Slug</code></td>
+            <td>@(e.Activo ? "Sí" : "No")</td>
+            <td class="small text-muted">@e.CreadoEn.ToLocalTime().ToString("yyyy-MM-dd")</td>
+        </tr>
+    }
+    </tbody>
+</table>

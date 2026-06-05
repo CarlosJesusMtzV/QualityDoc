@@ -1,0 +1,37 @@
+@{
+    ViewData["Title"] = "Inicio";
+}
+
+<div class="p-5 mb-4 bg-white rounded-3 shadow-sm border">
+    <h1 class="display-6 fw-bold"><i class="bi bi-file-earmark-check text-primary"></i> QualityDoc</h1>
+    <p class="lead">Sistema de Gestión Documental de Calidad — ASP.NET Core MVC con SQL Server, PostgreSQL y MongoDB.</p>
+    <a class="btn btn-primary btn-lg" asp-controller="Auth" asp-action="Login">
+        <i class="bi bi-box-arrow-in-right"></i> Iniciar sesión
+    </a>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card h-100"><div class="card-body">
+            <h5 class="card-title"><i class="bi bi-diagram-3 text-primary"></i> Multi-empresa y roles</h5>
+            <p class="card-text small text-muted">SuperAdmin, Admin, Revisor, Creador y Lector. Cada empresa con sus áreas y usuarios.</p>
+        </div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100"><div class="card-body">
+            <h5 class="card-title"><i class="bi bi-arrow-repeat text-primary"></i> Flujo y versiones</h5>
+            <p class="card-text small text-muted">Crear → Revisar → Aprobar. Versionado SemVer y historial completo (vigente, obsoletas, rechazadas).</p>
+        </div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100"><div class="card-body">
+            <h5 class="card-title"><i class="bi bi-clipboard-data text-primary"></i> Auditoría y estadísticas</h5>
+            <p class="card-text small text-muted">Bitácora de logins y movimientos (solo admin) y dashboard con gráficas.</p>
+        </div></div>
+    </div>
+</div>
+
+<div class="alert alert-info mt-4 small">
+    <strong>Usuarios de prueba</strong> (contraseña <code>QualityDoc2026!</code>):
+    superadmin@qualitydoc.sys · admin@empresa-demo.com · revisor@empresa-demo.com · creador@empresa-demo.com · lector@empresa-demo.com
+</div>

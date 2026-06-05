@@ -1,0 +1,21 @@
+@model List<QualityDoc.Models.Domain.Area>
+@{ ViewData["Title"] = "Áreas"; }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Áreas</h3>
+    <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg"></i> Nueva área</a>
+</div>
+
+<table class="table table-hover bg-white align-middle">
+    <thead class="table-light"><tr><th>Nombre</th><th>Descripción</th><th>Global</th></tr></thead>
+    <tbody>
+    @foreach (var a in Model)
+    {
+        <tr>
+            <td>@a.Nombre</td>
+            <td class="small text-muted">@a.Descripcion</td>
+            <td>@(a.EsGlobal ? "Sí" : "No")</td>
+        </tr>
+    }
+    </tbody>
+</table>
