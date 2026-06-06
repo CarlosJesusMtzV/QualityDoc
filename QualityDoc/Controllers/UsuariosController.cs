@@ -56,6 +56,28 @@ public class UsuariosController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Toggle(int id)
+    {
+        var u = await _db.Usuarios.FirstOrDefaultAsync(x => x.Id == id);
+        if (u is null) return NotFound();
+        if (u.Id == _tenant.UsuarioId)
+        {
+            TempData["Error"] = "No puedes desactivar tu propio usuario.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        u.Activo = !u.Activo;
+        await _db.SaveChangesAsync();
+
+        await _audit.LogAsync(_tenant.EmpresaId, _tenant.UsuarioId, _tenant.Email, _tenant.Rol,
+            AccionAudit.UsuarioCreado, "Usuario", u.Id.ToString(), new { activo = u.Activo });
+
+        TempData["Ok"] = u.Activo ? "Usuario activado." : "Usuario desactivado.";
+        return RedirectToAction(nameof(Index));
+    }
+
     private async Task<List<SelectListItem>> RolesSelect()
     {
         bool esSuper = _tenant.Rol == Roles.SuperAdmin;

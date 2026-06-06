@@ -54,8 +54,7 @@ public class DocumentosController : Controller
             var areaNombre = areaId is null ? null
                 : await _db.Areas.Where(a => a.Id == areaId).Select(a => a.Nombre).FirstOrDefaultAsync();
 
-            var metas = await _meta.BuscarAsync(_tenant.EmpresaId, q, areaNombre, soloVigentes);
-            var ids = metas.Select(m => m.VersionId).Distinct().ToList();
+            var ids = await _meta.BuscarVersionIdsAsync(_tenant.EmpresaId, q, areaNombre, soloVigentes);
 
             var encontrados = await _docs.ListarPorIdsAsync(ids, soloVigentes);
             if (!string.IsNullOrWhiteSpace(tipo))
@@ -210,13 +209,31 @@ public class DocumentosController : Controller
         return File(file.Value.Stream, "application/octet-stream", file.Value.Nombre);
     }
 
-    // Metadatos en vivo (JSON desde MongoDB) para mostrar en un modal.
+    // Metadatos en vivo: los pide al microservicio Node (que los tiene en MongoDB).
     public async Task<IActionResult> Metadatos(int versionId)
     {
         var v = await _docs.ObtenerVersionAsync(versionId);
         if (v is null) return NotFound();
 
-        var meta = await _meta.ObtenerAsync(versionId);
+        var metadatos = new Dictionary<string, string>();
+        string? nginxUrl = null;
+
+        var json = await _meta.ObtenerJsonAsync(versionId);
+        if (json is not null)
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("metadatos", out var m) && m.ValueKind == System.Text.Json.JsonValueKind.Object)
+                    foreach (var prop in m.EnumerateObject())
+                        metadatos[prop.Name] = prop.Value.ToString();
+                if (root.TryGetProperty("nginx_url", out var nu) && nu.ValueKind == System.Text.Json.JsonValueKind.String)
+                    nginxUrl = nu.GetString();
+            }
+            catch { /* JSON inesperado: devolvemos lo básico */ }
+        }
+
         return Json(new
         {
             version = v.VersionTag,
@@ -224,8 +241,8 @@ public class DocumentosController : Controller
             tipo = v.TipoArchivo,
             tamanioBytes = v.TamanioBytes,
             estado = v.Estado,
-            nginxUrl = meta?.NginxUrl,
-            metadatos = meta?.Metadatos ?? new Dictionary<string, string>()
+            nginxUrl,
+            metadatos
         });
     }
 

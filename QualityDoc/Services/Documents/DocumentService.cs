@@ -1,10 +1,7 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using QualityDoc.Data;
 using QualityDoc.Models.Domain;
-using QualityDoc.Models.Mongo;
 using QualityDoc.Services.Audit;
-using QualityDoc.Services.Extraction;
 using QualityDoc.Services.Search;
 using QualityDoc.Services.Storage;
 using QualityDoc.Services.Tenant;
@@ -17,19 +14,18 @@ public class DocumentService : IDocumentService
     private readonly ITenantContext _tenant;
     private readonly ISemVerService _sem;
     private readonly IFileStorageService _storage;
-    private readonly IMetadataService _meta;
+    private readonly IMetadataService _meta;   // cliente HTTP hacia Node.js
     private readonly IAuditService _audit;
     private readonly IConfiguration _config;
-    private readonly IMetadataExtractor _extractor;
 
     public DocumentService(CoreDbContext db, ITenantContext tenant, ISemVerService sem,
-        IFileStorageService storage, IMetadataService meta, IAuditService audit, IConfiguration config,
-        IMetadataExtractor extractor)
+        IFileStorageService storage, IMetadataService meta, IAuditService audit, IConfiguration config)
     {
         _db = db; _tenant = tenant; _sem = sem; _storage = storage;
-        _meta = meta; _audit = audit; _config = config; _extractor = extractor;
+        _meta = meta; _audit = audit; _config = config;
     }
 
+    // ── Crear documento + v1.0.0 ──────────────────────────────
     public async Task<int> CrearAsync(string titulo, string? descripcion, int areaId, IFormFile archivo)
     {
         var doc = new Documento
@@ -41,7 +37,7 @@ public class DocumentService : IDocumentService
             CreadoPorId = _tenant.UsuarioId ?? 0
         };
         _db.Documentos.Add(doc);
-        await _db.SaveChangesAsync(); // obtiene doc.Id
+        await _db.SaveChangesAsync();
 
         var version = new DocumentoVersion
         {
@@ -54,11 +50,10 @@ public class DocumentService : IDocumentService
         };
         var stored = await _storage.GuardarAsync(_tenant.EmpresaSlug ?? "empresa", doc.Id, version.VersionTag, archivo);
         AplicarArchivo(version, stored);
-        ExtraerMetadatos(version, stored);
         _db.DocumentoVersiones.Add(version);
         await _db.SaveChangesAsync();
 
-        await SincronizarMetaAsync(doc, version, areaId);
+        await NotificarIndexAsync(doc, version);   // Node extrae metadatos en segundo plano
         await _audit.LogAsync(_tenant.EmpresaId, _tenant.UsuarioId, _tenant.Email, _tenant.Rol,
             AccionAudit.DocCreado, "Documento", doc.Id.ToString(), new { titulo, version = version.VersionTag });
         return doc.Id;
@@ -74,12 +69,15 @@ public class DocumentService : IDocumentService
         doc.Titulo = titulo;
         doc.Descripcion = descripcion;
         doc.AreaId = areaId;
-        doc.Area = null; // fuerza recálculo del nombre de área en la metadata
         await _db.SaveChangesAsync();
 
-        // Re-sincroniza la metadata de la última versión (título/área pueden haber cambiado).
-        var latest = doc.Versiones.OrderByDescending(v => v.Id).FirstOrDefault();
-        if (latest is not null) await SincronizarMetaAsync(doc, latest, areaId);
+        var areaNombre = await NombreAreaAsync(areaId);
+        foreach (var v in doc.Versiones)
+            await _meta.NotificarEstadoAsync(new StatePayload
+            {
+                DocumentoId = doc.Id, VersionId = v.Id, Estado = v.Estado, EsVigente = v.EsVigente,
+                VersionTag = v.VersionTag, Titulo = titulo, Area = areaNombre
+            });
 
         await _audit.LogAsync(_tenant.EmpresaId, _tenant.UsuarioId, _tenant.Email, _tenant.Rol,
             AccionAudit.DocCreado, "Documento", doc.Id.ToString(), new { editado = true, titulo });
@@ -105,10 +103,9 @@ public class DocumentService : IDocumentService
 
         var stored = await _storage.GuardarAsync(_tenant.EmpresaSlug ?? "empresa", v.DocumentoId, v.VersionTag, archivo);
         AplicarArchivo(v, stored);
-        ExtraerMetadatos(v, stored);
         await _db.SaveChangesAsync();
 
-        await SincronizarMetaAsync(v.Documento!, v, v.Documento!.AreaId);
+        await NotificarIndexAsync(v.Documento!, v);
         await _audit.LogAsync(_tenant.EmpresaId, _tenant.UsuarioId, _tenant.Email, _tenant.Rol,
             AccionAudit.VersionSubida, "DocumentoVersion", v.Id.ToString(), new { version = v.VersionTag });
     }
@@ -124,7 +121,7 @@ public class DocumentService : IDocumentService
         v.Estado = EstadoVersion.EnRevision;
         await _db.SaveChangesAsync();
 
-        await SincronizarMetaAsync(v.Documento!, v, v.Documento!.AreaId);
+        await NotificarEstadoAsync(v);
         await _audit.LogAsync(_tenant.EmpresaId, _tenant.UsuarioId, _tenant.Email, _tenant.Rol,
             AccionAudit.DocEnviadoRev, "DocumentoVersion", v.Id.ToString(), new { version = v.VersionTag });
     }
@@ -135,12 +132,11 @@ public class DocumentService : IDocumentService
         if (v.Estado != EstadoVersion.EnRevision)
             throw new InvalidOperationException("Solo una versión EN_REVISION puede aprobarse.");
 
-        // La versión vigente anterior pasa a OBSOLETO (conserva FueAprobada = true).
         var vigentes = await _db.DocumentoVersiones
             .Where(x => x.DocumentoId == v.DocumentoId && x.EsVigente)
             .ToListAsync();
         foreach (var old in vigentes) { old.EsVigente = false; old.Estado = EstadoVersion.Obsoleto; }
-        await _db.SaveChangesAsync(); // libera el índice único de "una vigente"
+        await _db.SaveChangesAsync();
 
         var (ma, me, pa) = _sem.Siguiente(v.VersionMayor, v.VersionMenor, v.VersionPatch, null, esAprobacion: true);
         v.VersionMayor = ma; v.VersionMenor = me; v.VersionPatch = pa; v.VersionTag = _sem.Tag(ma, me, pa);
@@ -152,7 +148,8 @@ public class DocumentService : IDocumentService
         v.RevisadoEn = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
-        await SincronizarMetaAsync(v.Documento!, v, v.Documento!.AreaId);
+        foreach (var old in vigentes) await NotificarEstadoAsync(old);
+        await NotificarEstadoAsync(v);
         await _audit.LogAsync(_tenant.EmpresaId, _tenant.UsuarioId, _tenant.Email, _tenant.Rol,
             AccionAudit.DocAprobado, "DocumentoVersion", v.Id.ToString(), new { version = v.VersionTag });
     }
@@ -169,7 +166,6 @@ public class DocumentService : IDocumentService
         v.RevisadoPorId = _tenant.UsuarioId;
         v.RevisadoEn = DateTime.UtcNow;
 
-        // Nueva versión BORRADOR con el número que corresponde, partiendo del archivo rechazado.
         var (ma, me, pa) = _sem.Siguiente(v.VersionMayor, v.VersionMenor, v.VersionPatch, tipoRechazo, esAprobacion: false);
         var nueva = new DocumentoVersion
         {
@@ -188,13 +184,14 @@ public class DocumentService : IDocumentService
         _db.DocumentoVersiones.Add(nueva);
         await _db.SaveChangesAsync();
 
-        await SincronizarMetaAsync(v.Documento!, v, v.Documento!.AreaId);
-        await SincronizarMetaAsync(v.Documento!, nueva, v.Documento!.AreaId);
+        await NotificarEstadoAsync(v);
+        await NotificarIndexAsync(v.Documento!, nueva);
         await _audit.LogAsync(_tenant.EmpresaId, _tenant.UsuarioId, _tenant.Email, _tenant.Rol,
             AccionAudit.DocRechazado, "DocumentoVersion", v.Id.ToString(),
             new { rechazada = v.VersionTag, tipo = tipoRechazo, nueva = nueva.VersionTag });
     }
 
+    // ── Consultas ─────────────────────────────────────────────
     public async Task<(List<DocumentoVersion> Items, int Total)> ListarAsync(
         int? areaId, string? tipo, bool soloVigentes, int page, int pageSize)
     {
@@ -205,7 +202,6 @@ public class DocumentService : IDocumentService
         if (soloVigentes)
             q = q.Where(v => v.EsVigente);
         else
-            // última versión por documento (Id máximo)
             q = q.Where(v => v.Id == _db.DocumentoVersiones
                 .Where(x => x.DocumentoId == v.DocumentoId).Max(x => x.Id));
 
@@ -243,7 +239,7 @@ public class DocumentService : IDocumentService
             .Include(v => v.Documento)!.ThenInclude(d => d!.Area)
             .FirstOrDefaultAsync(v => v.Id == versionId);
 
-    // ── helpers ───────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────
     private async Task<DocumentoVersion> CargarVersionAsync(int versionId) =>
         await _db.DocumentoVersiones
             .Include(v => v.Documento)!.ThenInclude(d => d!.Area)
@@ -259,48 +255,21 @@ public class DocumentService : IDocumentService
         v.TamanioBytes = f.TamanioBytes;
     }
 
-    // Extrae los metadatos del archivo recién guardado y los deja en la versión.
-    private void ExtraerMetadatos(DocumentoVersion v, StoredFile stored)
-    {
-        var f = _storage.Abrir(stored.RutaRelativa, stored.Nombre);
-        if (f is null) return;
-        using var stream = f.Value.Stream;
-        var extr = _extractor.Extraer(stream, stored.Nombre, stored.Tipo);
-        v.MetadatosJson = JsonSerializer.Serialize(extr.Propiedades);
-        v.TextoExtracto = extr.TextoBusqueda;
-    }
+    private async Task<string> NombreAreaAsync(int areaId) =>
+        await _db.Areas.Where(a => a.Id == areaId).Select(a => a.Nombre).FirstOrDefaultAsync() ?? string.Empty;
 
-    private async Task SincronizarMetaAsync(Documento doc, DocumentoVersion v, int areaId)
+    private async Task NotificarIndexAsync(Documento doc, DocumentoVersion v)
     {
-        var areaNombre = doc.Area?.Nombre
-            ?? (await _db.Areas.Where(a => a.Id == areaId).Select(a => a.Nombre).FirstOrDefaultAsync())
-            ?? string.Empty;
-
-        // URL pública en Nginx (si está configurado el file server).
+        var areaNombre = doc.Area?.Nombre ?? await NombreAreaAsync(doc.AreaId);
         var nginxBase = _config["Files:NginxBaseUrl"];
         var nginxUrl = string.IsNullOrWhiteSpace(nginxBase) || v.RutaArchivo is null
             ? null
             : $"{nginxBase.TrimEnd('/')}/{v.RutaArchivo}";
 
-        // Metadatos extraídos (se guardan como objeto JSON en Mongo) + etiquetas.
-        var metadatos = new Dictionary<string, string>();
-        if (!string.IsNullOrWhiteSpace(v.MetadatosJson))
+        await _meta.NotificarIndexAsync(new IndexPayload
         {
-            try { metadatos = JsonSerializer.Deserialize<Dictionary<string, string>>(v.MetadatosJson) ?? new(); }
-            catch { /* ignore */ }
-        }
-        var etiquetas = new List<string>();
-        if (metadatos.TryGetValue("PalabrasClave", out var kw) && !string.IsNullOrWhiteSpace(kw))
-            etiquetas = kw.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-
-        await _meta.UpsertAsync(new DocumentMetadata
-        {
-            NginxUrl = nginxUrl,
-            Metadatos = metadatos,
-            Etiquetas = etiquetas,
-            TextoExtracto = v.TextoExtracto,
             EmpresaId = v.EmpresaId,
-            EmpresaSlug = _tenant.EmpresaSlug ?? string.Empty,
+            EmpresaSlug = _tenant.EmpresaSlug,
             DocumentoId = doc.Id,
             VersionId = v.Id,
             VersionTag = v.VersionTag,
@@ -310,10 +279,21 @@ public class DocumentService : IDocumentService
             Estado = v.Estado,
             EsVigente = v.EsVigente,
             RutaArchivo = v.RutaArchivo,
+            NombreArchivo = v.NombreArchivo,
+            NginxUrl = nginxUrl,
             HashSha256 = v.HashSha256,
             TamanioBytes = v.TamanioBytes,
-            SubidoPor = _tenant.Email,
-            FechaSubida = v.CreadoEn
+            SubidoPor = _tenant.Email
         });
     }
+
+    private async Task NotificarEstadoAsync(DocumentoVersion v) =>
+        await _meta.NotificarEstadoAsync(new StatePayload
+        {
+            DocumentoId = v.DocumentoId,
+            VersionId = v.Id,
+            Estado = v.Estado,
+            EsVigente = v.EsVigente,
+            VersionTag = v.VersionTag
+        });
 }

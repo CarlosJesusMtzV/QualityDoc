@@ -49,4 +49,21 @@ public class AreasController : Controller
         TempData["Ok"] = "Área creada.";
         return RedirectToAction(nameof(Index));
     }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Eliminar(int id)
+    {
+        var a = await _db.Areas.FirstOrDefaultAsync(x => x.Id == id);
+        if (a is null) return NotFound();
+
+        a.EliminadoEn = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        await _audit.LogAsync(_tenant.EmpresaId, _tenant.UsuarioId, _tenant.Email, _tenant.Rol,
+            AccionAudit.AreaCreada, "Area", a.Id.ToString(), new { baja = true });
+
+        TempData["Ok"] = "Área dada de baja.";
+        return RedirectToAction(nameof(Index));
+    }
 }
