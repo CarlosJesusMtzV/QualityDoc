@@ -13,6 +13,9 @@ public interface IDocumentService
     /// <summary>Baja lógica del documento (deja de aparecer en listados).</summary>
     Task EliminarAsync(int documentoId);
 
+    /// <summary>Nueva edición: sube un archivo de reemplazo como nueva versión (siguiente mayor) en BORRADOR.</summary>
+    Task<int> NuevaVersionAsync(int documentoId, IFormFile archivo);
+
     /// <summary>Reemplaza el archivo de una versión en BORRADOR (editar antes de enviar).</summary>
     Task SubirArchivoAsync(int versionId, IFormFile archivo);
 

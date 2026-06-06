@@ -39,12 +39,13 @@ public class DocumentService : IDocumentService
         _db.Documentos.Add(doc);
         await _db.SaveChangesAsync();
 
+        var (vm, vn, vp) = _sem.Inicial();   // v0.1.0
         var version = new DocumentoVersion
         {
             DocumentoId = doc.Id,
             EmpresaId = _tenant.EmpresaId,
-            VersionMayor = 1, VersionMenor = 0, VersionPatch = 0,
-            VersionTag = _sem.Tag(1, 0, 0),
+            VersionMayor = vm, VersionMenor = vn, VersionPatch = vp,
+            VersionTag = _sem.Tag(vm, vn, vp),
             Estado = EstadoVersion.Borrador,
             SubidoPorId = _tenant.UsuarioId ?? 0
         };
@@ -95,6 +96,37 @@ public class DocumentService : IDocumentService
             AccionAudit.DocCreado, "Documento", doc.Id.ToString(), new { baja = true });
     }
 
+    // Editar = subir un archivo que reemplaza: crea una NUEVA edición (siguiente mayor) en BORRADOR.
+    public async Task<int> NuevaVersionAsync(int documentoId, IFormFile archivo)
+    {
+        var doc = await _db.Documentos
+            .Include(d => d.Versiones)
+            .FirstOrDefaultAsync(d => d.Id == documentoId)
+            ?? throw new InvalidOperationException("Documento no encontrado.");
+
+        var maxMayor = doc.Versiones.Count == 0 ? 0 : doc.Versiones.Max(x => x.VersionMayor);
+        var (ma, me, pa) = _sem.NuevaEdicion(maxMayor);   // v1.0.0 -> v2.0.0
+
+        var version = new DocumentoVersion
+        {
+            DocumentoId = doc.Id,
+            EmpresaId = doc.EmpresaId,
+            VersionMayor = ma, VersionMenor = me, VersionPatch = pa,
+            VersionTag = _sem.Tag(ma, me, pa),
+            Estado = EstadoVersion.Borrador,
+            SubidoPorId = _tenant.UsuarioId ?? 0
+        };
+        var stored = await _storage.GuardarAsync(_tenant.EmpresaSlug ?? "empresa", doc.Id, version.VersionTag, archivo);
+        AplicarArchivo(version, stored);
+        _db.DocumentoVersiones.Add(version);
+        await _db.SaveChangesAsync();
+
+        await NotificarIndexAsync(doc, version);
+        await _audit.LogAsync(_tenant.EmpresaId, _tenant.UsuarioId, _tenant.Email, _tenant.Rol,
+            AccionAudit.VersionSubida, "DocumentoVersion", version.Id.ToString(), new { nuevaEdicion = version.VersionTag });
+        return version.Id;
+    }
+
     public async Task SubirArchivoAsync(int versionId, IFormFile archivo)
     {
         var v = await CargarVersionAsync(versionId);
@@ -138,7 +170,7 @@ public class DocumentService : IDocumentService
         foreach (var old in vigentes) { old.EsVigente = false; old.Estado = EstadoVersion.Obsoleto; }
         await _db.SaveChangesAsync();
 
-        var (ma, me, pa) = _sem.Siguiente(v.VersionMayor, v.VersionMenor, v.VersionPatch, null, esAprobacion: true);
+        var (ma, me, pa) = _sem.AlAprobar(v.VersionMayor, v.VersionMenor, v.VersionPatch);
         v.VersionMayor = ma; v.VersionMenor = me; v.VersionPatch = pa; v.VersionTag = _sem.Tag(ma, me, pa);
         v.Estado = EstadoVersion.Aprobado;
         v.EsVigente = true;
@@ -166,7 +198,7 @@ public class DocumentService : IDocumentService
         v.RevisadoPorId = _tenant.UsuarioId;
         v.RevisadoEn = DateTime.UtcNow;
 
-        var (ma, me, pa) = _sem.Siguiente(v.VersionMayor, v.VersionMenor, v.VersionPatch, tipoRechazo, esAprobacion: false);
+        var (ma, me, pa) = _sem.Rechazo(v.VersionMayor, v.VersionMenor, v.VersionPatch, tipoRechazo);
         var nueva = new DocumentoVersion
         {
             DocumentoId = v.DocumentoId,

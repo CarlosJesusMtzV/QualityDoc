@@ -150,6 +150,22 @@ public class DocumentosController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    // Editar = nueva versión (subir archivo de reemplazo -> nueva edición en BORRADOR).
+    [Authorize(Roles = PuedeEditar)]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> NuevaVersion(int documentoId, IFormFile archivo)
+    {
+        if (archivo is null || archivo.Length == 0)
+            TempData["Error"] = "Sube un archivo válido para la nueva versión.";
+        else
+        {
+            await _docs.NuevaVersionAsync(documentoId, archivo);
+            TempData["Ok"] = "Nueva versión creada (BORRADOR). Envíala a revisión cuando quieras.";
+        }
+        return RedirectToAction(nameof(Details), new { id = documentoId });
+    }
+
     [Authorize(Roles = PuedeEditar)]
     [HttpPost]
     [ValidateAntiForgeryToken]

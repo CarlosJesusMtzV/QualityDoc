@@ -20,7 +20,8 @@ public class DashboardController : Controller
 
     public async Task<IActionResult> Index()
     {
-        var versiones = _db.DocumentoVersiones;
+        // Solo versiones de documentos NO dados de baja (el filtro de Documentos excluye EliminadoEn).
+        var versiones = _db.Documentos.SelectMany(d => d.Versiones);
 
         ViewBag.TotalDocumentos = await _db.Documentos.CountAsync();
         ViewBag.Vigentes   = await versiones.CountAsync(v => v.EsVigente);

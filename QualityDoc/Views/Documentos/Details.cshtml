@@ -37,15 +37,14 @@
         @if (puedeEditar)
         {
             <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.Id">
-                <i class="bi bi-pencil"></i> Editar
+                <i class="bi bi-pencil"></i> Editar datos
             </a>
         }
         @if (User.IsInRole("SUPERADMIN") || User.IsInRole("ADMIN"))
         {
-            <form asp-action="Eliminar" method="post" class="d-inline" onsubmit="return confirm('¿Dar de baja este documento?');">
-                <input type="hidden" name="id" value="@Model.Id" />
-                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Dar de baja</button>
-            </form>
+            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#delModal">
+                <i class="bi bi-trash"></i> Dar de baja
+            </button>
         }
     </div>
 </div>
@@ -116,6 +115,20 @@
             else if (latest.Estado == "EN_REVISION")
             {
                 <span class="text-muted">En revisión. Un revisor o admin debe aprobar o rechazar.</span>
+            }
+            else if (latest.Estado == "APROBADO" && puedeEditar)
+            {
+                <form asp-action="NuevaVersion" method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
+                    <input type="hidden" name="documentoId" value="@Model.Id" />
+                    <div class="col-md-7">
+                        <label class="form-label small mb-0">Nueva versión (subir archivo de reemplazo)</label>
+                        <input type="file" name="archivo" class="form-control" required />
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-primary w-100"><i class="bi bi-arrow-up-circle"></i> Crear nueva versión</button>
+                    </div>
+                    <div class="col-12"><div class="form-text">Crea una nueva edición (siguiente versión mayor) en BORRADOR que pasará por revisión. Al aprobarla, esta quedará vigente y la actual pasará a obsoleta.</div></div>
+                </form>
             }
             else
             {
@@ -193,6 +206,29 @@
         </ul>
     </nav>
 }
+
+@* ── Modal de advertencia para dar de baja ── *@
+<div class="modal fade" id="delModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Dar de baja documento</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Seguro que quieres dar de baja <strong>@Model.Titulo</strong>?</p>
+                <p class="small text-muted mb-0">Dejará de aparecer en los listados, en el portal y en las gráficas. No se borra físicamente (baja lógica), pero ya no estará disponible.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form asp-action="Eliminar" method="post" class="d-inline">
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-trash"></i> Sí, dar de baja</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 
 @* ── Modal de metadatos (se cargan en vivo desde MongoDB) ── *@
 <div class="modal fade" id="metaModal" tabindex="-1">

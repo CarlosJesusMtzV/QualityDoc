@@ -30,7 +30,7 @@
     }
 </div>
 
-<form method="get" class="row g-2 mb-3">
+<form id="filtros" method="get" class="row g-2 mb-3">
     <div class="col-md-4">
         <div class="input-group">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
@@ -113,4 +113,21 @@
             }
         </ul>
     </nav>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            const f = document.getElementById('filtros');
+            if (!f) return;
+            // Área: se aplica al instante al seleccionar
+            const sel = f.querySelector('select[name="areaId"]');
+            if (sel) sel.addEventListener('change', () => f.submit());
+            // Texto y tipo: se aplican con una pequeña pausa al escribir
+            let t;
+            f.querySelectorAll('input[name="q"], input[name="tipo"]').forEach(inp => {
+                inp.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => f.submit(), 600); });
+            });
+        })();
+    </script>
 }
