@@ -1,0 +1,85 @@
+@model QualityDoc.Models.ViewModels.ReporteModel
+@{
+    ViewData["Title"] = Model.Titulo;
+    var path = Context.Request.Path.Value ?? "";
+    var query = Context.Request.QueryString.Value ?? "";
+    string pdfUrl = System.Text.RegularExpressions.Regex.IsMatch(query, "formato=", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+        ? path + System.Text.RegularExpressions.Regex.Replace(query, "formato=[^&]*", "formato=pdf")
+        : path + (string.IsNullOrEmpty(query) ? "?formato=pdf" : query + "&formato=pdf");
+}
+
+<style>
+    @@media print {
+        .qd-sidebar, .qd-topbar, .qd-footer, .no-print { display: none !important; }
+        .qd-content { padding: 0 !important; }
+        .qd-shell { display: block !important; }
+        .card { border: none !important; box-shadow: none !important; }
+    }
+    .rep-kpi { border: 1px solid var(--bs-border-color); border-radius: .5rem; padding: .6rem .8rem; height: 100%; }
+    .rep-kpi .v { font-size: 1.3rem; font-weight: 700; color: #334155; line-height: 1.1; }
+    .rep-kpi .l { font-size: .68rem; color: #64748b; text-transform: uppercase; letter-spacing: .05em; }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-3 no-print">
+    <a asp-action="Index" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Reportes</a>
+    <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir</button>
+        <a class="btn btn-sm btn-primary" href="@pdfUrl"><i class="bi bi-file-earmark-pdf"></i> Descargar PDF</a>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-3">
+            <div>
+                <div class="fw-bold" style="color:#334155;font-size:1.35rem">QualityDoc</div>
+                <div class="fw-semibold">@Model.Titulo</div>
+                @if (!string.IsNullOrWhiteSpace(Model.Subtitulo))
+                {
+                    <div class="text-muted small">@Model.Subtitulo</div>
+                }
+            </div>
+            <div class="text-end small text-muted">
+                <div>Empresa: <strong>@Model.Empresa</strong></div>
+                <div>Generado: @Model.Generado.ToString("yyyy-MM-dd HH:mm")</div>
+                @if (!string.IsNullOrWhiteSpace(Model.GeneradoPor))
+                {
+                    <div>Por: @Model.GeneradoPor</div>
+                }
+            </div>
+        </div>
+
+        @if (Model.Resumen.Count > 0)
+        {
+            <div class="row g-2 mb-3">
+                @foreach (var k in Model.Resumen)
+                {
+                    <div class="col-6 col-md">
+                        <div class="rep-kpi"><div class="v">@k.Valor</div><div class="l">@k.Label</div></div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (Model.Columnas.Count > 0)
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle">
+                    <thead class="table-dark">
+                        <tr>@foreach (var c in Model.Columnas) { <th>@c</th> }</tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var fila in Model.Filas)
+                        {
+                            <tr>@foreach (var celda in fila) { <td class="small">@celda</td> }</tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (Model.Filas.Count == 0)
+            {
+                <p class="text-muted mb-0">Sin datos para los filtros seleccionados.</p>
+            }
+        }
+    </div>
+</div>

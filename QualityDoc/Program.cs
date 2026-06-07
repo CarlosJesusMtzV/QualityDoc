@@ -6,6 +6,9 @@ using QualityDoc.Services.Tenant;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// QuestPDF (generación de reportes PDF) — licencia gratuita Community.
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
 // ── MVC ───────────────────────────────────────────────────────
 builder.Services.AddControllersWithViews();
 builder.Services.AddHttpContextAccessor();

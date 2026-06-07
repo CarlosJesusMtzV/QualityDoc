@@ -1,0 +1,102 @@
+@using Microsoft.AspNetCore.Mvc.Rendering
+@{
+    ViewData["Title"] = "Reportes";
+    var areas = ViewBag.Areas as List<SelectListItem> ?? new();
+    var docs = ViewBag.Documentos as List<SelectListItem> ?? new();
+}
+
+<p class="text-muted">Genera reportes del sistema. Cada uno se puede ver en pantalla (imprimible) o descargar en PDF.</p>
+
+<div class="row g-3">
+
+    @* 1) Inventario *@
+    <div class="col-md-6 col-xl-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-body d-flex flex-column">
+                <h6 class="fw-semibold"><i class="bi bi-folder2-open text-primary"></i> Inventario de documentos</h6>
+                <p class="text-muted small flex-grow-1">Listado por área con estado, versión vigente y autor.</p>
+                <form asp-action="Inventario" method="get">
+                    <select name="areaId" class="form-select form-select-sm mb-2">
+                        <option value="">Todas las áreas</option>
+                        @foreach (var a in areas) { <option value="@a.Value">@a.Text</option> }
+                    </select>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary flex-fill"><i class="bi bi-eye"></i> Ver</button>
+                        <button type="submit" name="formato" value="pdf" class="btn btn-sm btn-primary flex-fill"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    @* 2) Cumplimiento / Auditoría *@
+    <div class="col-md-6 col-xl-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-body d-flex flex-column">
+                <h6 class="fw-semibold"><i class="bi bi-shield-check text-primary"></i> Cumplimiento / Auditoría</h6>
+                <p class="text-muted small flex-grow-1">Acciones registradas: creaciones, aprobaciones, rechazos y descargas.</p>
+                <form asp-action="Auditoria" method="get">
+                    <select name="periodo" class="form-select form-select-sm mb-2" title="Periodo">
+                        <option value="">Todo el historial</option>
+                        <option value="7">Últimos 7 días</option>
+                        <option value="30" selected>Últimos 30 días</option>
+                        <option value="90">Últimos 90 días</option>
+                        <option value="mes">Este mes</option>
+                        <option value="anio">Este año</option>
+                    </select>
+                    <select name="accion" class="form-select form-select-sm mb-2" title="Acción">
+                        <option value="">Todas las acciones</option>
+                        <option value="DOC_CREADO">Documentos creados</option>
+                        <option value="DOC_ENVIADO_REVISION">Enviados a revisión</option>
+                        <option value="DOC_APROBADO">Aprobaciones</option>
+                        <option value="DOC_RECHAZADO">Rechazos</option>
+                        <option value="VERSION_SUBIDA">Versiones subidas</option>
+                        <option value="USUARIO_CREADO">Usuarios creados</option>
+                        <option value="LOGIN_OK">Inicios de sesión</option>
+                    </select>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary flex-fill"><i class="bi bi-eye"></i> Ver</button>
+                        <button type="submit" name="formato" value="pdf" class="btn btn-sm btn-primary flex-fill"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    @* 3) KPIs *@
+    <div class="col-md-6 col-xl-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-body d-flex flex-column">
+                <h6 class="fw-semibold"><i class="bi bi-graph-up text-primary"></i> KPIs / estadísticas</h6>
+                <p class="text-muted small flex-grow-1">Tiempo de aprobación, % de rechazo y desglose por área.</p>
+                <form asp-action="Kpis" method="get">
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary flex-fill"><i class="bi bi-eye"></i> Ver</button>
+                        <button type="submit" name="formato" value="pdf" class="btn btn-sm btn-primary flex-fill"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    @* 4) Historial de un documento *@
+    <div class="col-md-6 col-xl-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-body d-flex flex-column">
+                <h6 class="fw-semibold"><i class="bi bi-clock-history text-primary"></i> Historial de un documento</h6>
+                <p class="text-muted small flex-grow-1">Todas las versiones de un documento con sus decisiones.</p>
+                <form asp-action="Historial" method="get">
+                    <select name="documentoId" class="form-select form-select-sm mb-2" required>
+                        <option value="">— Selecciona un documento —</option>
+                        @foreach (var d in docs) { <option value="@d.Value">@d.Text</option> }
+                    </select>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary flex-fill"><i class="bi bi-eye"></i> Ver</button>
+                        <button type="submit" name="formato" value="pdf" class="btn btn-sm btn-primary flex-fill"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+</div>
