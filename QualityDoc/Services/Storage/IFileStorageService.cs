@@ -12,4 +12,7 @@ public interface IFileStorageService
 
     /// <summary>Abre un archivo previamente guardado. Devuelve null si no existe.</summary>
     (Stream Stream, string Nombre)? Abrir(string rutaRelativa, string nombre);
+
+    /// <summary>Guarda bytes directamente (usado por la siembra de datos demo).</summary>
+    StoredFile GuardarBytes(string empresaSlug, int documentoId, string versionTag, string nombreArchivo, byte[] contenido);
 }

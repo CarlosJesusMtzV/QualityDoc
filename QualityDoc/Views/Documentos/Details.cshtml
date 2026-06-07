@@ -78,17 +78,7 @@
         <div class="card-body">
             @if (latest.Estado == "BORRADOR" && puedeEditar)
             {
-                <form asp-action="SubirArchivo" method="post" enctype="multipart/form-data" class="row g-2 align-items-end mb-3">
-                    <input type="hidden" name="versionId" value="@latest.Id" />
-                    <input type="hidden" name="documentoId" value="@Model.Id" />
-                    <div class="col-md-7">
-                        <label class="form-label small mb-0">Reemplazar / subir archivo</label>
-                        <input type="file" name="archivo" class="form-control" />
-                    </div>
-                    <div class="col-md-3">
-                        <button class="btn btn-outline-secondary w-100"><i class="bi bi-upload"></i> Guardar archivo</button>
-                    </div>
-                </form>
+                <p class="text-muted small mb-2">Esta versión está en BORRADOR con su archivo cargado. Cuando esté lista, envíala a revisión.</p>
                 <form asp-action="EnviarRevision" method="post" onsubmit="return confirm('¿Enviar a revisión?');">
                     <input type="hidden" name="versionId" value="@latest.Id" />
                     <input type="hidden" name="documentoId" value="@Model.Id" />
@@ -108,17 +98,27 @@
             }
             else if (latest.Estado == "APROBADO" && puedeEditar)
             {
-                <form asp-action="NuevaVersion" method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
-                    <input type="hidden" name="documentoId" value="@Model.Id" />
-                    <div class="col-md-7">
-                        <label class="form-label small mb-0">Nueva versión (subir archivo de reemplazo)</label>
-                        <input type="file" name="archivo" class="form-control" required />
+                <div class="border rounded-3 bg-light-subtle p-3">
+                    <div class="d-flex align-items-start mb-3">
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary-subtle text-primary me-3 flex-shrink-0" style="width:44px;height:44px">
+                            <i class="bi bi-arrow-up-circle fs-4"></i>
+                        </span>
+                        <div>
+                            <h6 class="mb-1 fw-semibold">Crear una nueva versión</h6>
+                            <p class="text-muted small mb-0">Sube un archivo de reemplazo. Se generará una edición en <strong>BORRADOR</strong> que pasará por revisión; al aprobarla quedará vigente y la versión <strong>@latest.VersionTag</strong> pasará a obsoleta.</p>
+                        </div>
                     </div>
-                    <div class="col-md-4">
-                        <button class="btn btn-primary w-100"><i class="bi bi-arrow-up-circle"></i> Crear nueva versión</button>
-                    </div>
-                    <div class="col-12"><div class="form-text">Crea una nueva edición en BORRADOR que pasará por revisión. Al aprobarla quedará vigente; la anterior vigente pasará a obsoleta.</div></div>
-                </form>
+                    <form asp-action="NuevaVersion" method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
+                        <input type="hidden" name="documentoId" value="@Model.Id" />
+                        <div class="col-md-8">
+                            <label class="form-label small text-muted mb-1">Archivo de la nueva versión</label>
+                            <input type="file" name="archivo" class="form-control" required />
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-primary w-100"><i class="bi bi-arrow-up-circle me-1"></i> Crear nueva versión</button>
+                        </div>
+                    </form>
+                </div>
             }
             else
             {
@@ -132,15 +132,23 @@ else if (puedeEditar)
     @* No hay versión vigente ni en proceso (p.ej. la última quedó rechazada): se permite empezar una nueva. *@
     <div class="card shadow-sm mb-4">
         <div class="card-body">
-            <p class="text-muted small mb-2">Este documento no tiene una versión vigente ni en proceso.</p>
+            <div class="d-flex align-items-start mb-3">
+                <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary-subtle text-primary me-3 flex-shrink-0" style="width:44px;height:44px">
+                    <i class="bi bi-arrow-up-circle fs-4"></i>
+                </span>
+                <div>
+                    <h6 class="mb-1 fw-semibold">Crear una nueva versión</h6>
+                    <p class="text-muted small mb-0">Este documento no tiene una versión vigente ni en proceso. Sube un archivo para empezar una edición en BORRADOR que pasará por revisión.</p>
+                </div>
+            </div>
             <form asp-action="NuevaVersion" method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
                 <input type="hidden" name="documentoId" value="@Model.Id" />
-                <div class="col-md-7">
-                    <label class="form-label small mb-0">Nueva versión (subir archivo)</label>
+                <div class="col-md-8">
+                    <label class="form-label small text-muted mb-1">Archivo de la nueva versión</label>
                     <input type="file" name="archivo" class="form-control" required />
                 </div>
                 <div class="col-md-4">
-                    <button class="btn btn-primary w-100"><i class="bi bi-arrow-up-circle"></i> Crear nueva versión</button>
+                    <button class="btn btn-primary w-100"><i class="bi bi-arrow-up-circle me-1"></i> Crear nueva versión</button>
                 </div>
             </form>
         </div>

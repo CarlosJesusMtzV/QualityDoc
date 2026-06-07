@@ -41,6 +41,27 @@ public class FileStorageService : IFileStorageService
         return new StoredFile(rel, safeName, tipo, hash, file.Length);
     }
 
+    public StoredFile GuardarBytes(string empresaSlug, int documentoId, string versionTag, string nombreArchivo, byte[] contenido)
+    {
+        var ext = Path.GetExtension(nombreArchivo);
+        var baseSan = Sanitizar(Path.GetFileNameWithoutExtension(nombreArchivo));
+        if (string.IsNullOrWhiteSpace(baseSan)) baseSan = "documento";
+        var safeName = baseSan + ext;
+
+        var relDir = Path.Combine(empresaSlug, documentoId.ToString(), versionTag);
+        var absDir = Path.Combine(_basePath, relDir);
+        Directory.CreateDirectory(absDir);
+
+        var absPath = Path.Combine(absDir, safeName);
+        File.WriteAllBytes(absPath, contenido);
+
+        using var sha = SHA256.Create();
+        var hash = Convert.ToHexString(sha.ComputeHash(contenido)).ToLowerInvariant();
+        var tipo = Path.GetExtension(safeName).TrimStart('.').ToLowerInvariant();
+        var rel = Path.Combine(relDir, safeName).Replace('\\', '/');
+        return new StoredFile(rel, safeName, tipo, hash, contenido.Length);
+    }
+
     public (Stream Stream, string Nombre)? Abrir(string rutaRelativa, string nombre)
     {
         var abs = Path.Combine(_basePath, rutaRelativa.Replace('/', Path.DirectorySeparatorChar));

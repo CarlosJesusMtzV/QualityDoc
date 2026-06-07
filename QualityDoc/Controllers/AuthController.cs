@@ -33,7 +33,7 @@ public class AuthController : Controller
 
         if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
             return Redirect(returnUrl);
-        return RedirectToAction("Index", "Dashboard");
+        return RedirectToAction("Index", "Documentos");
     }
 
     [HttpGet]

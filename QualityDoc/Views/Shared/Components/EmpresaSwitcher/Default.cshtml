@@ -4,10 +4,10 @@
     var ret = ViewBag.ReturnUrl as string ?? "/";
     var activaNombre = activaId == 0 ? "Todas las empresas" : (Model.FirstOrDefault(e => e.Id == activaId)?.Nombre ?? "Empresa");
 }
-<div class="nav-item dropdown">
-    <a class="nav-link dropdown-toggle text-warning" href="#" data-bs-toggle="dropdown" title="Empresa activa (SuperAdmin)">
+<div class="dropdown">
+    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" title="Empresa activa (SuperAdmin)">
         <i class="bi bi-building"></i> @activaNombre
-    </a>
+    </button>
     <ul class="dropdown-menu dropdown-menu-end">
         <li><h6 class="dropdown-header">Trabajar como…</h6></li>
         <li>

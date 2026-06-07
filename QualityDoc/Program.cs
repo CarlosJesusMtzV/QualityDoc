@@ -71,7 +71,8 @@ using (var scope = app.Services.CreateScope())
         await audit.Database.MigrateAsync();
 
         var seedPwd = builder.Configuration["Seed:AdminPassword"] ?? "QualityDoc2026!";
-        await DbSeeder.SeedAsync(core, seedPwd);
+        var storage = sp.GetRequiredService<QualityDoc.Services.Storage.IFileStorageService>();
+        await DbSeeder.SeedAsync(core, seedPwd, storage);
         // Los índices de MongoDB los crea el microservicio Node.js al arrancar.
     }
     catch (Exception ex)

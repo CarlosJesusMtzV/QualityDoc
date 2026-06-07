@@ -8,7 +8,10 @@ namespace QualityDoc.Controllers
     {
         public IActionResult Index()
         {
-            return View();
+            // La pantalla inicial siempre es el área de Documentos (o el login si no hay sesión).
+            if (User?.Identity?.IsAuthenticated == true)
+                return RedirectToAction("Index", "Documentos");
+            return RedirectToAction("Login", "Auth");
         }
 
         public IActionResult Privacy()
