@@ -2,9 +2,14 @@
 @{
     ViewData["Title"] = Model.Titulo;
     var versiones = Model.Versiones.ToList();
-    var latest = versiones.FirstOrDefault();
+    // "Versión de trabajo": la que está en proceso (borrador/revisión) o, si no hay, la vigente.
+    // Las versiones rechazadas NO se muestran aquí; solo quedan en el historial.
+    var enProceso = versiones.FirstOrDefault(v => v.Estado == "BORRADOR" || v.Estado == "EN_REVISION");
+    var vigente = versiones.FirstOrDefault(v => v.EsVigente);
+    var latest = enProceso ?? vigente;
     bool puedeEditar  = User.IsInRole("SUPERADMIN") || User.IsInRole("ADMIN") || User.IsInRole("REVISOR") || User.IsInRole("CREADOR");
     bool puedeAprobar = User.IsInRole("SUPERADMIN") || User.IsInRole("ADMIN") || User.IsInRole("REVISOR");
+    bool esLector = !puedeEditar; // el Lector solo ve/descarga/previsualiza la versión vigente
 }
 @functions {
     static string Badge(string estado) => estado switch
@@ -60,9 +65,14 @@
             </span>
             @if (latest.RutaArchivo != null)
             {
-                <a class="btn btn-sm btn-outline-primary" asp-action="Download" asp-route-versionId="@latest.Id">
-                    <i class="bi bi-download"></i> @latest.NombreArchivo
-                </a>
+                <span class="text-nowrap">
+                    <button type="button" class="btn btn-sm btn-primary js-ver" data-version-id="@latest.Id" data-nombre="@latest.NombreArchivo">
+                        <i class="bi bi-eye"></i> Ver
+                    </button>
+                    <a class="btn btn-sm btn-outline-primary" asp-action="Download" asp-route-versionId="@latest.Id">
+                        <i class="bi bi-download"></i> @latest.NombreArchivo
+                    </a>
+                </span>
             }
         </div>
         <div class="card-body">
@@ -87,30 +97,10 @@
             }
             else if (latest.Estado == "EN_REVISION" && puedeAprobar)
             {
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <form asp-action="Aprobar" method="post">
-                            <input type="hidden" name="versionId" value="@latest.Id" />
-                            <input type="hidden" name="documentoId" value="@Model.Id" />
-                            <label class="form-label small">Comentario (opcional)</label>
-                            <textarea name="comentario" class="form-control mb-2" rows="2"></textarea>
-                            <button class="btn btn-success w-100"><i class="bi bi-check-lg"></i> Aprobar (→ versión mayor, vigente)</button>
-                        </form>
-                    </div>
-                    <div class="col-md-6">
-                        <form asp-action="Rechazar" method="post">
-                            <input type="hidden" name="versionId" value="@latest.Id" />
-                            <input type="hidden" name="documentoId" value="@Model.Id" />
-                            <label class="form-label small">Tipo de cambio</label>
-                            <select name="tipoRechazo" class="form-select mb-2">
-                                <option value="MENOR">Menor (patch +1)</option>
-                                <option value="MAYOR">Mayor (minor +1)</option>
-                            </select>
-                            <textarea name="comentario" class="form-control mb-2" rows="1" placeholder="Motivo"></textarea>
-                            <button class="btn btn-danger w-100"><i class="bi bi-x-lg"></i> Rechazar (genera nueva versión)</button>
-                        </form>
-                    </div>
-                </div>
+                <p class="mb-2 text-muted small">Este documento está esperando tu revisión.</p>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#revisarModal">
+                    <i class="bi bi-clipboard-check"></i> Revisar documento
+                </button>
             }
             else if (latest.Estado == "EN_REVISION")
             {
@@ -127,7 +117,7 @@
                     <div class="col-md-4">
                         <button class="btn btn-primary w-100"><i class="bi bi-arrow-up-circle"></i> Crear nueva versión</button>
                     </div>
-                    <div class="col-12"><div class="form-text">Crea una nueva edición (siguiente versión mayor) en BORRADOR que pasará por revisión. Al aprobarla, esta quedará vigente y la actual pasará a obsoleta.</div></div>
+                    <div class="col-12"><div class="form-text">Crea una nueva edición en BORRADOR que pasará por revisión. Al aprobarla quedará vigente; la anterior vigente pasará a obsoleta.</div></div>
                 </form>
             }
             else
@@ -137,27 +127,52 @@
         </div>
     </div>
 }
-
-@* ── Historial completo de versiones (paginado) ── *@
-@{
-    int hpage = 1;
-    int.TryParse(Context.Request.Query["hpage"], out hpage);
-    if (hpage < 1) hpage = 1;
-    const int hsize = 10;
-    int totalH = versiones.Count;
-    int totalHPages = (int)Math.Ceiling(totalH / (double)hsize);
-    var histItems = versiones.Skip((hpage - 1) * hsize).Take(hsize).ToList();
+else if (puedeEditar)
+{
+    @* No hay versión vigente ni en proceso (p.ej. la última quedó rechazada): se permite empezar una nueva. *@
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <p class="text-muted small mb-2">Este documento no tiene una versión vigente ni en proceso.</p>
+            <form asp-action="NuevaVersion" method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
+                <input type="hidden" name="documentoId" value="@Model.Id" />
+                <div class="col-md-7">
+                    <label class="form-label small mb-0">Nueva versión (subir archivo)</label>
+                    <input type="file" name="archivo" class="form-control" required />
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-primary w-100"><i class="bi bi-arrow-up-circle"></i> Crear nueva versión</button>
+                </div>
+            </form>
+        </div>
+    </div>
 }
-<h5>Historial de versiones <span class="text-muted small">(@totalH)</span></h5>
+
+@* ── Historial de versiones (filtrable por estado y nº de versión) ── *@
+<h5>Historial de versiones <span class="text-muted small">(@versiones.Count)</span></h5>
+<div class="row g-2 mb-2">
+    <div class="col-md-3">
+        <select id="fEstado" class="form-select form-select-sm">
+            <option value="">Todos los estados</option>
+            <option value="APROBADO">Aprobadas</option>
+            <option value="RECHAZADO">Rechazadas</option>
+            <option value="OBSOLETO">Obsoletas</option>
+            <option value="BORRADOR">Borrador</option>
+            <option value="EN_REVISION">En revisión</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <input id="fVersion" class="form-control form-control-sm" placeholder="Buscar nº de versión (ej. 1.0)">
+    </div>
+</div>
 <div class="table-responsive">
     <table class="table table-sm table-striped align-middle bg-white">
         <thead class="table-light">
             <tr><th>Versión</th><th>Estado</th><th>Tipo</th><th>Subido por</th><th>Fecha</th><th>Comentario</th><th></th></tr>
         </thead>
-        <tbody>
-        @foreach (var v in histItems)
+        <tbody id="histBody">
+        @foreach (var v in versiones)
         {
-            <tr>
+            <tr data-estado="@v.Estado" data-version="@v.VersionTag">
                 <td>
                     <span class="badge bg-light text-dark border">@v.VersionTag</span>
                     @if (v.EsVigente) { <span class="badge bg-success">vigente</span> }
@@ -171,6 +186,12 @@
                 <td class="text-end text-nowrap">
                     @if (v.RutaArchivo != null)
                     {
+                        @if (!esLector || v.EsVigente)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-secondary js-ver" data-version-id="@v.Id" data-nombre="@v.NombreArchivo" title="Vista previa">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        }
                         <button type="button" class="btn btn-sm btn-outline-info" onclick="verMetadatos(@v.Id)" title="Ver metadatos">
                             <i class="bi bi-info-circle"></i>
                         </button>
@@ -193,19 +214,7 @@
     </table>
 </div>
 
-@if (totalHPages > 1)
-{
-    <nav>
-        <ul class="pagination pagination-sm">
-            @for (int p = 1; p <= totalHPages; p++)
-            {
-                <li class="page-item @(p == hpage ? "active" : "")">
-                    <a class="page-link" asp-action="Details" asp-route-id="@Model.Id" asp-route-hpage="@p">@p</a>
-                </li>
-            }
-        </ul>
-    </nav>
-}
+<p id="histVacio" class="text-muted small d-none">No hay versiones que coincidan con el filtro.</p>
 
 @* ── Modal de advertencia para dar de baja ── *@
 <div class="modal fade" id="delModal" tabindex="-1">
@@ -225,6 +234,80 @@
                     <input type="hidden" name="id" value="@Model.Id" />
                     <button type="submit" class="btn btn-danger"><i class="bi bi-trash"></i> Sí, dar de baja</button>
                 </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ── Modal de revisión (aprobar / rechazar por pasos) ── *@
+@if (latest != null && latest.Estado == "EN_REVISION" && puedeAprobar)
+{
+    <div class="modal fade" id="revisarModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-clipboard-check"></i> Revisar documento — @latest.VersionTag</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" onclick="revVolver()"></button>
+                </div>
+                <div class="modal-body">
+                  <div class="row g-3">
+                    <div class="col-lg-7">
+                        <div class="small text-muted mb-1"><i class="bi bi-file-earmark-text"></i> @latest.NombreArchivo</div>
+                        <div id="revPreview" data-version-id="@latest.Id" data-nombre="@latest.NombreArchivo">
+                            <div class="text-center text-muted py-5 border rounded">Cargando vista previa…</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-5">
+                        <div id="revPaso1">
+                            <p>¿Qué decisión tomas sobre esta versión?</p>
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-success" onclick="revElegir('aprobar')"><i class="bi bi-check-lg"></i> Aprobar</button>
+                                <button type="button" class="btn btn-danger" onclick="revElegir('rechazar')"><i class="bi bi-x-lg"></i> Rechazar</button>
+                            </div>
+                        </div>
+
+                        <form id="revAprobar" class="d-none" asp-action="Aprobar" method="post">
+                            <input type="hidden" name="versionId" value="@latest.Id" />
+                            <input type="hidden" name="documentoId" value="@Model.Id" />
+                            <div class="alert alert-success py-2 small mb-2">Vas a <strong>aprobar</strong>. Quedará vigente; si es una edición, sube de versión mayor y la anterior pasa a obsoleta.</div>
+                            <label class="form-label small">¿Por qué? (comentario, opcional)</label>
+                            <textarea name="comentario" class="form-control mb-3" rows="3"></textarea>
+                            <div class="d-flex justify-content-between">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="revVolver()">&larr; Volver</button>
+                                <button type="submit" class="btn btn-success"><i class="bi bi-check-lg"></i> Confirmar aprobación</button>
+                            </div>
+                        </form>
+
+                        <form id="revRechazar" class="d-none" asp-action="Rechazar" method="post">
+                            <input type="hidden" name="versionId" value="@latest.Id" />
+                            <input type="hidden" name="documentoId" value="@Model.Id" />
+                            <div class="alert alert-danger py-2 small mb-2">Vas a <strong>rechazar</strong> esta versión. Quedará marcada como RECHAZADA y subirá de número (p.ej. v2.0.0 → v2.1.0). Si hace falta, después se podrá subir una nueva versión.</div>
+                            <label class="form-label small">¿Por qué? (motivo)</label>
+                            <textarea name="comentario" class="form-control mb-3" rows="3"></textarea>
+                            <div class="d-flex justify-content-between">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="revVolver()">&larr; Volver</button>
+                                <button type="submit" class="btn btn-danger"><i class="bi bi-x-lg"></i> Confirmar rechazo</button>
+                            </div>
+                        </form>
+                    </div>
+                  </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* ── Modal de vista previa del documento ── *@
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-truncate"><i class="bi bi-file-earmark-text"></i> <span id="previewTitulo">Documento</span></h5>
+                <a id="previewDescargar" class="btn btn-sm btn-outline-primary ms-auto me-2" href="#"><i class="bi bi-download"></i> Descargar</a>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="previewBody"><div class="text-center text-muted py-5">Cargando…</div></div>
             </div>
         </div>
     </div>
@@ -276,5 +359,78 @@
                         '<div class="alert alert-danger">No se pudieron cargar los metadatos.</div>';
                 });
         }
+
+        // ── Revisión por pasos (elegir aprobar/rechazar) ──
+        function revElegir(op) {
+            document.getElementById('revPaso1').classList.add('d-none');
+            document.getElementById('revAprobar').classList.toggle('d-none', op !== 'aprobar');
+            document.getElementById('revRechazar').classList.toggle('d-none', op !== 'rechazar');
+        }
+        function revVolver() {
+            const p1 = document.getElementById('revPaso1'); if (p1) p1.classList.remove('d-none');
+            const a = document.getElementById('revAprobar'); if (a) a.classList.add('d-none');
+            const r = document.getElementById('revRechazar'); if (r) r.classList.add('d-none');
+        }
+
+        // ── Vista previa del documento ──
+        const VER_URL = '@Url.Action("Ver", "Documentos")';
+        const DL_URL  = '@Url.Action("Download", "Documentos")';
+        function previewMarkup(versionId, nombre) {
+            const ext = (nombre || '').toLowerCase().split('.').pop();
+            const url = VER_URL + '?versionId=' + versionId;
+            if (ext === 'pdf')
+                return `<iframe src="${url}" class="w-100 border rounded" style="height:75vh" title="Vista previa"></iframe>`;
+            if (['png','jpg','jpeg','gif','webp','svg'].includes(ext))
+                return `<div class="text-center border rounded p-2 bg-light" style="max-height:75vh;overflow:auto"><img src="${url}" class="img-fluid" alt="Vista previa"></div>`;
+            if (ext === 'txt')
+                return `<iframe src="${url}" class="w-100 border rounded bg-white" style="height:60vh" title="Vista previa"></iframe>`;
+            const dl = DL_URL + '?versionId=' + versionId;
+            return `<div class="alert alert-secondary mb-0">No hay vista previa para archivos <strong>.${ext}</strong> (Word, Excel, CAD, etc.). <a href="${dl}" class="alert-link"><i class="bi bi-download"></i> Descárgalo</a> para abrirlo en tu equipo.</div>`;
+        }
+        function verDocumento(versionId, nombre) {
+            document.getElementById('previewTitulo').textContent = nombre || 'Documento';
+            document.getElementById('previewBody').innerHTML = previewMarkup(versionId, nombre);
+            document.getElementById('previewDescargar').href = DL_URL + '?versionId=' + versionId;
+            new bootstrap.Modal(document.getElementById('previewModal')).show();
+        }
+        document.querySelectorAll('.js-ver').forEach(b =>
+            b.addEventListener('click', () => verDocumento(b.dataset.versionId, b.dataset.nombre)));
+
+        // Carga diferida del preview dentro del modal de revisión (solo al abrirlo).
+        (function () {
+            const rm = document.getElementById('revisarModal');
+            if (!rm) return;
+            rm.addEventListener('show.bs.modal', function () {
+                const c = document.getElementById('revPreview');
+                if (c && !c.dataset.loaded) {
+                    c.innerHTML = previewMarkup(c.dataset.versionId, c.dataset.nombre);
+                    c.dataset.loaded = '1';
+                }
+            });
+        })();
+
+        // ── Filtro del historial (estado + nº de versión) ──
+        (function () {
+            const est = document.getElementById('fEstado');
+            const ver = document.getElementById('fVersion');
+            const body = document.getElementById('histBody');
+            const vacio = document.getElementById('histVacio');
+            if (!body) return;
+            function aplicar() {
+                const e = (est ? est.value : '').toUpperCase();
+                const v = (ver ? ver.value : '').toLowerCase().trim();
+                let visibles = 0;
+                body.querySelectorAll('tr').forEach(tr => {
+                    const okE = !e || (tr.dataset.estado || '') === e;
+                    const okV = !v || (tr.dataset.version || '').toLowerCase().includes(v);
+                    const show = okE && okV;
+                    tr.classList.toggle('d-none', !show);
+                    if (show) visibles++;
+                });
+                if (vacio) vacio.classList.toggle('d-none', visibles > 0);
+            }
+            if (est) est.addEventListener('change', aplicar);
+            if (ver) ver.addEventListener('input', aplicar);
+        })();
     </script>
 }

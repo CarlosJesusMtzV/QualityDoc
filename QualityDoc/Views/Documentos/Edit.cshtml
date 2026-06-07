@@ -1,9 +1,9 @@
 @model QualityDoc.Models.ViewModels.DocumentoEditViewModel
 @{
-    ViewData["Title"] = "Editar documento";
+    ViewData["Title"] = "Editar datos del documento";
 }
 
-<h3 class="mb-3">Editar documento</h3>
+<h3 class="mb-3">Editar datos del documento</h3>
 
 <div class="card shadow-sm">
     <div class="card-body">
@@ -22,17 +22,9 @@
                 <textarea asp-for="Descripcion" class="form-control" rows="2"></textarea>
             </div>
 
-            <div class="mb-3">
-                <label class="form-label">Área</label>
-                <select asp-for="AreaId" asp-items="Model.Areas" class="form-select">
-                    <option value="">— Selecciona —</option>
-                </select>
-                <span asp-validation-for="AreaId" class="text-danger small"></span>
-            </div>
-
             <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Guardar cambios</button>
             <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary">Cancelar</a>
         </form>
-        <p class="form-text mt-2">Para cambiar el archivo o la versión, usa el flujo de versiones en el detalle.</p>
+        <p class="form-text mt-2">Para subir un archivo nuevo (nueva versión) usa el botón "Nueva versión" en el detalle. El área no se modifica aquí.</p>
     </div>
 </div>

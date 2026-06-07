@@ -25,16 +25,7 @@ public static class DbSeeder
         }
         await db.SaveChangesAsync();
 
-        int RolId(string nombre) => db.Roles.IgnoreQueryFilters().First(r => r.Nombre == nombre).Id;
-
-        // Usuarios (uno por rol)
-        await EnsureUsuario(db, "superadmin@qualitydoc.sys", hash, "Super", "Admin",     sistema.Id, RolId(Roles.SuperAdmin));
-        await EnsureUsuario(db, "admin@empresa-demo.com",    hash, "Ana",   "Garcia",    demo.Id,    RolId(Roles.Admin));
-        await EnsureUsuario(db, "revisor@empresa-demo.com",  hash, "Luis",  "Martinez",  demo.Id,    RolId(Roles.Revisor));
-        await EnsureUsuario(db, "creador@empresa-demo.com",  hash, "Maria", "Lopez",     demo.Id,    RolId(Roles.Creador));
-        await EnsureUsuario(db, "lector@empresa-demo.com",   hash, "Carlos","Rodriguez", demo.Id,    RolId(Roles.Lector));
-
-        // Areas de la empresa demo
+        // Areas de la empresa demo (ANTES de los usuarios, para poder asignar el área)
         if (!await db.Areas.IgnoreQueryFilters().AnyAsync(a => a.EmpresaId == demo.Id))
         {
             db.Areas.AddRange(
@@ -43,18 +34,30 @@ public static class DbSeeder
                 new Area { EmpresaId = demo.Id, Nombre = "Recursos Humanos", Descripcion = "Politicas y procedimientos de RRHH", EsGlobal = true },
                 new Area { EmpresaId = demo.Id, Nombre = "Produccion",       Descripcion = "Manuales y procedimientos de produccion", EsGlobal = true },
                 new Area { EmpresaId = demo.Id, Nombre = "Mantenimiento",    Descripcion = "Planes y registros de mantenimiento", EsGlobal = false });
+            await db.SaveChangesAsync();
         }
+
+        int RolId(string nombre) => db.Roles.IgnoreQueryFilters().First(r => r.Nombre == nombre).Id;
+        int calidadId = db.Areas.IgnoreQueryFilters().First(a => a.EmpresaId == demo.Id && a.Nombre == "Calidad").Id;
+
+        // Usuarios (uno por rol). Lector/Creador/Revisor van al área "Calidad".
+        await EnsureUsuario(db, "superadmin@qualitydoc.sys", hash, "Super", "Admin",     sistema.Id, RolId(Roles.SuperAdmin), null);
+        await EnsureUsuario(db, "admin@empresa-demo.com",    hash, "Ana",   "Garcia",    demo.Id,    RolId(Roles.Admin),      null);
+        await EnsureUsuario(db, "revisor@empresa-demo.com",  hash, "Luis",  "Martinez",  demo.Id,    RolId(Roles.Revisor),    calidadId);
+        await EnsureUsuario(db, "creador@empresa-demo.com",  hash, "Maria", "Lopez",     demo.Id,    RolId(Roles.Creador),    calidadId);
+        await EnsureUsuario(db, "lector@empresa-demo.com",   hash, "Carlos","Rodriguez", demo.Id,    RolId(Roles.Lector),     calidadId);
+
         await db.SaveChangesAsync();
     }
 
     private static async Task EnsureUsuario(CoreDbContext db, string email, string hash,
-        string nombre, string apellido, int empresaId, int rolId)
+        string nombre, string apellido, int empresaId, int rolId, int? areaId)
     {
         if (await db.Usuarios.IgnoreQueryFilters().AnyAsync(u => u.Email == email)) return;
         db.Usuarios.Add(new Usuario
         {
             Email = email, PasswordHash = hash, Nombre = nombre, Apellido = apellido,
-            EmpresaId = empresaId, RolId = rolId, Activo = true
+            EmpresaId = empresaId, RolId = rolId, AreaId = areaId, Activo = true
         });
     }
 }

@@ -21,13 +21,25 @@
                 <textarea asp-for="Descripcion" class="form-control" rows="2"></textarea>
             </div>
 
-            <div class="mb-3">
-                <label class="form-label">Área</label>
-                <select asp-for="AreaId" asp-items="Model.Areas" class="form-select">
-                    <option value="">— Selecciona —</option>
-                </select>
-                <span asp-validation-for="AreaId" class="text-danger small"></span>
-            </div>
+            @if (ViewBag.AreaFija != null)
+            {
+                <input type="hidden" asp-for="AreaId" />
+                <div class="mb-3">
+                    <label class="form-label">Área</label>
+                    <input class="form-control" value="@ViewBag.AreaFija" disabled />
+                    <div class="form-text">Tu área asignada (los documentos se crean aquí).</div>
+                </div>
+            }
+            else
+            {
+                <div class="mb-3">
+                    <label class="form-label">Área</label>
+                    <select asp-for="AreaId" asp-items="Model.Areas" class="form-select">
+                        <option value="">— Selecciona —</option>
+                    </select>
+                    <span asp-validation-for="AreaId" class="text-danger small"></span>
+                </div>
+            }
 
             <div class="mb-3">
                 <label class="form-label">Archivo</label>

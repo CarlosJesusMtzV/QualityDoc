@@ -1,31 +1,71 @@
 @model List<QualityDoc.Models.Audit.AuditLog>
-@{ ViewData["Title"] = "Auditoría"; }
+@{
+    ViewData["Title"] = "Auditoría";
+    bool global = ViewBag.Global == true;
+    var nombres = ViewBag.NombrePorEmpresa as Dictionary<int, string>;
+    var empresas = ViewBag.Empresas as List<QualityDoc.Models.Domain.Empresa>;
+    int empresaFiltro = ViewBag.EmpresaId ?? 0;
+}
 
 <h3 class="mb-3">Auditoría</h3>
-<p class="text-muted small">Inicios de sesión y movimientos del sistema (últimos 300).</p>
+<p class="text-muted small">
+    Inicios de sesión y movimientos del sistema (últimos 300).
+    @if (global) { <span>Estás viendo <strong>todas las empresas</strong>.</span> }
+    else { <span>Estás viendo solo <strong>tu empresa</strong>.</span> }
+</p>
+
+@if (global && empresas != null)
+{
+    <form method="get" class="row g-2 mb-3" id="audFiltro">
+        <div class="col-md-4">
+            <select name="empresaId" class="form-select form-select-sm">
+                <option value="0">— Todas las empresas —</option>
+                @foreach (var e in empresas)
+                {
+                    <option value="@e.Id" selected="@(empresaFiltro == e.Id)">@e.Nombre</option>
+                }
+            </select>
+        </div>
+    </form>
+}
 
 <div class="table-responsive">
     <table class="table table-sm table-striped bg-white align-middle">
         <thead class="table-light">
-            <tr><th>Fecha</th><th>Usuario</th><th>Rol</th><th>Acción</th><th>Entidad</th><th>Detalle</th><th>IP</th></tr>
+            <tr>
+                <th>Fecha</th>
+                @if (global) { <th>Empresa</th> }
+                <th>Usuario</th><th>Rol</th><th>Acción</th><th>Entidad</th><th>Detalle</th><th>IP</th>
+            </tr>
         </thead>
         <tbody>
         @if (!Model.Any())
         {
-            <tr><td colspan="7" class="text-center text-muted py-4">Sin registros.</td></tr>
+            <tr><td colspan="@(global ? 8 : 7)" class="text-center text-muted py-4">Sin registros.</td></tr>
         }
         @foreach (var l in Model)
         {
             <tr>
                 <td class="small text-nowrap">@l.CreadoEn.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</td>
+                @if (global)
+                {
+                    <td class="small">@(nombres != null && nombres.ContainsKey(l.EmpresaId) ? nombres[l.EmpresaId] : $"#{l.EmpresaId}")</td>
+                }
                 <td class="small">@l.UsuarioEmail</td>
                 <td class="small">@l.Rol</td>
                 <td><span class="badge bg-info text-dark">@l.Accion</span></td>
                 <td class="small">@l.Entidad @(l.EntidadId != null ? $"#{l.EntidadId}" : "")</td>
-                <td class="small text-muted" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@l.Detalle</td>
+                <td class="small text-muted" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@l.Detalle</td>
                 <td class="small text-muted">@l.Ip</td>
             </tr>
         }
         </tbody>
     </table>
 </div>
+
+@section Scripts {
+    <script>
+        const s = document.querySelector('#audFiltro select[name="empresaId"]');
+        if (s) s.addEventListener('change', () => document.getElementById('audFiltro').submit());
+    </script>
+}

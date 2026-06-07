@@ -66,4 +66,27 @@ public class EmpresasController : Controller
         TempData["Ok"] = $"Empresa '{vm.Nombre}' creada con su admin y áreas por defecto.";
         return RedirectToAction(nameof(Index));
     }
+
+    // Fija (o limpia) la "empresa activa" del SuperAdmin. id null/0 = volver a "Todas".
+    [HttpGet]
+    public async Task<IActionResult> Activar(int? id, string? returnUrl)
+    {
+        if (id is null || id == 0)
+        {
+            Response.Cookies.Delete("qd_empresa_activa");
+            TempData["Ok"] = "Ahora ves TODAS las empresas (modo global).";
+        }
+        else
+        {
+            var emp = await _db.Empresas.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.Id == id);
+            if (emp is not null)
+            {
+                Response.Cookies.Append("qd_empresa_activa", $"{emp.Id}|{emp.Slug}",
+                    new CookieOptions { HttpOnly = true, IsEssential = true, Path = "/" });
+                TempData["Ok"] = $"Trabajando dentro de: {emp.Nombre}.";
+            }
+        }
+        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)) return Redirect(returnUrl);
+        return RedirectToAction("Index", "Dashboard");
+    }
 }

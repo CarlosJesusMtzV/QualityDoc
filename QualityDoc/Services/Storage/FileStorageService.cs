@@ -15,9 +15,14 @@ public class FileStorageService : IFileStorageService
         Directory.CreateDirectory(_basePath);
     }
 
-    public async Task<StoredFile> GuardarAsync(string empresaSlug, int documentoId, string versionTag, IFormFile file)
+    public async Task<StoredFile> GuardarAsync(string empresaSlug, int documentoId, string versionTag, IFormFile file, string nombreBase)
     {
-        var safeName = Path.GetFileName(file.FileName);
+        var ext = Path.GetExtension(file.FileName);                 // incluye el punto, p.ej ".pdf"
+        var baseSan = Sanitizar(nombreBase);
+        if (string.IsNullOrWhiteSpace(baseSan))
+            baseSan = Path.GetFileNameWithoutExtension(file.FileName);
+        var safeName = baseSan + ext;
+
         var relDir = Path.Combine(empresaSlug, documentoId.ToString(), versionTag);
         var absDir = Path.Combine(_basePath, relDir);
         Directory.CreateDirectory(absDir);
@@ -42,5 +47,14 @@ public class FileStorageService : IFileStorageService
         if (!File.Exists(abs)) return null;
         Stream stream = new FileStream(abs, FileMode.Open, FileAccess.Read);
         return (stream, nombre);
+    }
+
+    private static string Sanitizar(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return string.Empty;
+        foreach (var c in Path.GetInvalidFileNameChars()) s = s.Replace(c, ' ');
+        s = s.Replace('/', ' ').Replace('\\', ' ').Trim();
+        while (s.Contains("  ")) s = s.Replace("  ", " ");
+        return s;
     }
 }

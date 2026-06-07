@@ -32,6 +32,13 @@
                 </select>
                 <span asp-validation-for="RolId" class="text-danger small"></span>
             </div>
+            <div class="col-md-6">
+                <label class="form-label">Área <span class="text-muted small">(obligatoria para Lector/Creador/Revisor)</span></label>
+                <select asp-for="AreaId" asp-items="Model.Areas" class="form-select">
+                    <option value="">— Sin área (Admin) —</option>
+                </select>
+                <span asp-validation-for="AreaId" class="text-danger small"></span>
+            </div>
         </div>
         <div class="mt-3">
             <button class="btn btn-primary"><i class="bi bi-save"></i> Crear usuario</button>

@@ -3,31 +3,20 @@ using QualityDoc.Models.Domain;
 namespace QualityDoc.Services.Documents;
 
 /// <summary>
-/// Reglas de versionado:
-///   Crear                 → v0.1.0 (borrador, sin aprobar)
-///   Rechazo cambio MENOR  → patch +1     (v0.1.0 → v0.1.1 | v2.0.0 → v2.0.1)
-///   Rechazo cambio MAYOR  → minor +1     (v0.1.0 → v0.2.0 | v2.0.0 → v2.1.0)
-///   Aprobar (1ª vez, 0.x) → v1.0.0       (promueve de pre-release a entero)
-///   Aprobar (edición)     → mantiene el número (solo marca Vigente)
-///   Nueva edición (editar)→ siguiente mayor .0.0 (v1.0.0 → v2.0.0)
+/// Reglas de versionado (el número solo cambia al APROBAR o RECHAZAR, nunca al crear/editar/enviar):
+///   Crear                      → v1.0.0 (Borrador)
+///   Enviar a revisión          → sin cambio
+///   Editar (nueva versión)     → borrador que HEREDA el número del vigente (sin cambio aún)
+///   Aprobar (1ª vez)           → mantiene el número (v1.0.0 → v1.0.0, Vigente)
+///   Aprobar (edición)          → +mayor (v1.0.0 → v2.0.0 → v3.0.0); la anterior pasa a Obsoleta
+///   Rechazar                   → 2º número +1 (v2.0.0 → v2.1.0); queda RECHAZADO, sin crear borrador.
 /// </summary>
 public class SemVerService : ISemVerService
 {
-    public (int Mayor, int Menor, int Patch) Inicial() => (0, 1, 0);
+    public (int Mayor, int Menor, int Patch) Inicial() => (1, 0, 0);
 
-    public (int Mayor, int Menor, int Patch) Rechazo(int mayor, int menor, int patch, string tipoRechazo) =>
-        tipoRechazo switch
-        {
-            TipoRechazo.Menor => (mayor, menor, patch + 1),
-            TipoRechazo.Mayor => (mayor, menor + 1, 0),
-            _ => throw new ArgumentException($"TipoRechazo inválido: '{tipoRechazo}'. Use MENOR o MAYOR.")
-        };
-
-    public (int Mayor, int Menor, int Patch) AlAprobar(int mayor, int menor, int patch) =>
-        mayor == 0 ? (1, 0, 0) : (mayor, menor, patch);
-
-    public (int Mayor, int Menor, int Patch) NuevaEdicion(int mayorActualMaximo) =>
-        (mayorActualMaximo + 1, 0, 0);
+    public (int Mayor, int Menor, int Patch) AlAprobar(int mayor, int menor, int patch, bool esPrimeraAprobacion) =>
+        esPrimeraAprobacion ? (mayor, menor, patch) : (mayor + 1, 0, 0);
 
     public string Tag(int mayor, int menor, int patch) => $"v{mayor}.{menor}.{patch}";
 }

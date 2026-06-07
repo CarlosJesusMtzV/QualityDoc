@@ -32,10 +32,4 @@ public class DocumentoEditViewModel
 
     [StringLength(1000)]
     public string? Descripcion { get; set; }
-
-    [Required(ErrorMessage = "Selecciona un área.")]
-    [Display(Name = "Área")]
-    public int AreaId { get; set; }
-
-    public IEnumerable<SelectListItem> Areas { get; set; } = new List<SelectListItem>();
 }

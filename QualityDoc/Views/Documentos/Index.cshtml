@@ -8,6 +8,8 @@
     var tipo = ViewBag.Tipo as string;
     int page = ViewBag.Page ?? 1;
     int totalPages = ViewBag.TotalPages ?? 1;
+    var vista = ViewBag.Vista as string ?? "vigentes";
+    bool esLector = ViewBag.EsLector == true;
     bool puedeEditar = User.IsInRole("SUPERADMIN") || User.IsInRole("ADMIN") || User.IsInRole("REVISOR") || User.IsInRole("CREADOR");
 }
 @functions {
@@ -30,7 +32,24 @@
     }
 </div>
 
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link @(vista == "vigentes" ? "active" : "")" asp-action="Index" asp-route-vista="vigentes" asp-route-areaId="@areaId" asp-route-tipo="@tipo" asp-route-q="@q">
+            <i class="bi bi-check-circle"></i> Vigentes
+        </a>
+    </li>
+    @if (!esLector)
+    {
+        <li class="nav-item">
+            <a class="nav-link @(vista == "proceso" ? "active" : "")" asp-action="Index" asp-route-vista="proceso" asp-route-areaId="@areaId" asp-route-tipo="@tipo" asp-route-q="@q">
+                <i class="bi bi-hourglass-split"></i> En proceso
+            </a>
+        </li>
+    }
+</ul>
+
 <form id="filtros" method="get" class="row g-2 mb-3">
+    <input type="hidden" name="vista" value="@vista" />
     <div class="col-md-4">
         <div class="input-group">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
@@ -51,12 +70,16 @@
     @if (!string.IsNullOrEmpty(q) || areaId != null || !string.IsNullOrEmpty(tipo))
     {
         <div class="col-md-1">
-            <a asp-action="Index" class="btn btn-outline-secondary w-100" title="Limpiar"><i class="bi bi-x-lg"></i></a>
+            <a asp-action="Index" asp-route-vista="@vista" class="btn btn-outline-secondary w-100" title="Limpiar"><i class="bi bi-x-lg"></i></a>
         </div>
     }
 </form>
 
-@if (ViewBag.SoloVigentes == true)
+@if (vista == "proceso")
+{
+    <p class="text-muted small">Mostrando documentos <strong>en proceso</strong> (borradores y en revisión).</p>
+}
+else
 {
     <p class="text-muted small">Mostrando solo documentos <strong>vigentes</strong> (aprobados).</p>
 }
@@ -108,7 +131,7 @@
             @for (int p = 1; p <= totalPages; p++)
             {
                 <li class="page-item @(p == page ? "active" : "")">
-                    <a class="page-link" asp-action="Index" asp-route-q="@q" asp-route-areaId="@areaId" asp-route-tipo="@tipo" asp-route-page="@p">@p</a>
+                    <a class="page-link" asp-action="Index" asp-route-vista="@vista" asp-route-q="@q" asp-route-areaId="@areaId" asp-route-tipo="@tipo" asp-route-page="@p">@p</a>
                 </li>
             }
         </ul>

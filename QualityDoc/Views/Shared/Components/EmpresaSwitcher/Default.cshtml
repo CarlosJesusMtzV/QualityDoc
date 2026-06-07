@@ -1,0 +1,30 @@
+@model List<QualityDoc.Models.Domain.Empresa>
+@{
+    int activaId = ViewBag.ActivaId ?? 0;
+    var ret = ViewBag.ReturnUrl as string ?? "/";
+    var activaNombre = activaId == 0 ? "Todas las empresas" : (Model.FirstOrDefault(e => e.Id == activaId)?.Nombre ?? "Empresa");
+}
+<div class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle text-warning" href="#" data-bs-toggle="dropdown" title="Empresa activa (SuperAdmin)">
+        <i class="bi bi-building"></i> @activaNombre
+    </a>
+    <ul class="dropdown-menu dropdown-menu-end">
+        <li><h6 class="dropdown-header">Trabajar como…</h6></li>
+        <li>
+            <a class="dropdown-item @(activaId == 0 ? "active" : "")"
+               asp-controller="Empresas" asp-action="Activar" asp-route-id="0" asp-route-returnUrl="@ret">
+                <i class="bi bi-globe"></i> Todas (global)
+            </a>
+        </li>
+        <li><hr class="dropdown-divider"></li>
+        @foreach (var e in Model)
+        {
+            <li>
+                <a class="dropdown-item @(activaId == e.Id ? "active" : "")"
+                   asp-controller="Empresas" asp-action="Activar" asp-route-id="@e.Id" asp-route-returnUrl="@ret">
+                    @e.Nombre
+                </a>
+            </li>
+        }
+    </ul>
+</div>

@@ -34,6 +34,7 @@
                             </ul>
                         </div>
                     }
+                    @await Component.InvokeAsync("EmpresaSwitcher")
                     <span class="navbar-text text-white-50 mx-2 small">@User.Identity!.Name</span>
                     <a class="nav-link" asp-controller="Auth" asp-action="Logout">Salir</a>
                 }

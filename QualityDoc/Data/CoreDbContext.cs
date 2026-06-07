@@ -59,6 +59,8 @@ public class CoreDbContext : DbContext
                 .HasForeignKey(x => x.EmpresaId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Rol).WithMany(x => x.Usuarios)
                 .HasForeignKey(x => x.RolId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Area).WithMany()
+                .HasForeignKey(x => x.AreaId).OnDelete(DeleteBehavior.Restrict);
             e.HasQueryFilter(x => (_tenant.IgnoreTenantFilter || x.EmpresaId == _tenant.EmpresaId) && x.EliminadoEn == null);
         });
 

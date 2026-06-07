@@ -45,6 +45,7 @@ public class AuthService : IAuthService
             new(ClaimTypes.Role, user.Rol!.Nombre),
             new("empresa_id", user.EmpresaId.ToString()),
             new("empresa_slug", user.Empresa?.Slug ?? string.Empty),
+            new("area_id", user.AreaId?.ToString() ?? string.Empty),
             new("nombre", user.NombreCompleto)
         };
 

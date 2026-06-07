@@ -40,22 +40,25 @@ public class DocumentosController : Controller
 
     // Lista principal: última versión por documento; el Lector solo ve vigentes.
     // Con texto de búsqueda (q) usa el índice full-text de MongoDB.
-    public async Task<IActionResult> Index(int? areaId, string? tipo, string? q, int page = 1)
+    // Pestañas: "vigentes" (solo aprobados vigentes) | "proceso" (borradores y en revisión).
+    // Con texto (q) usa el índice full-text de MongoDB.
+    public async Task<IActionResult> Index(int? areaId, string? tipo, string? q, string vista = "vigentes", int page = 1)
     {
         if (page < 1) page = 1;
-        bool soloVigentes = _tenant.Nivel >= Roles.Nivel[Roles.Lector];
+        bool esLector = _tenant.Nivel >= Roles.Nivel[Roles.Lector];
+        if (esLector) vista = "vigentes";              // el Lector solo ve vigentes
+        if (vista != "proceso") vista = "vigentes";
+        bool soloVigentes = vista == "vigentes";
 
         List<DocumentoVersion> items;
         int total;
 
         if (!string.IsNullOrWhiteSpace(q))
         {
-            // Búsqueda full-text en MongoDB (título, etiquetas, texto extracto)
             var areaNombre = areaId is null ? null
                 : await _db.Areas.Where(a => a.Id == areaId).Select(a => a.Nombre).FirstOrDefaultAsync();
 
             var ids = await _meta.BuscarVersionIdsAsync(_tenant.EmpresaId, q, areaNombre, soloVigentes);
-
             var encontrados = await _docs.ListarPorIdsAsync(ids, soloVigentes);
             if (!string.IsNullOrWhiteSpace(tipo))
                 encontrados = encontrados.Where(v => v.TipoArchivo == tipo).ToList();
@@ -65,7 +68,7 @@ public class DocumentosController : Controller
         }
         else
         {
-            var (it, tot) = await _docs.ListarAsync(areaId, tipo, soloVigentes, page, PageSize);
+            var (it, tot) = await _docs.ListarAsync(areaId, tipo, vista, page, PageSize);
             items = it; total = tot;
         }
 
@@ -73,7 +76,8 @@ public class DocumentosController : Controller
         ViewBag.AreaId = areaId;
         ViewBag.Tipo = tipo;
         ViewBag.Q = q;
-        ViewBag.SoloVigentes = soloVigentes;
+        ViewBag.Vista = vista;
+        ViewBag.EsLector = esLector;
         ViewBag.Page = page;
         ViewBag.TotalPages = (int)Math.Ceiling(total / (double)PageSize);
         ViewBag.Total = total;
@@ -92,7 +96,9 @@ public class DocumentosController : Controller
     [HttpGet]
     public async Task<IActionResult> Create()
     {
-        return View(new DocumentoCreateViewModel { Areas = await AreasSelect(null) });
+        var vm = new DocumentoCreateViewModel();
+        await PrepararAreaCreate(vm);
+        return View(vm);
     }
 
     [Authorize(Roles = PuedeEditar)]
@@ -100,17 +106,35 @@ public class DocumentosController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(DocumentoCreateViewModel vm)
     {
+        // El Creador (limitado por área) siempre crea en su área.
+        if (_tenant.RestringidoPorArea && _tenant.AreaId is not null)
+            vm.AreaId = _tenant.AreaId.Value;
+
         if (vm.Archivo is null || vm.Archivo.Length == 0)
             ModelState.AddModelError(nameof(vm.Archivo), "Sube un archivo válido.");
         if (!ModelState.IsValid)
         {
-            vm.Areas = await AreasSelect(vm.AreaId);
+            await PrepararAreaCreate(vm);
             return View(vm);
         }
 
         var docId = await _docs.CrearAsync(vm.Titulo, vm.Descripcion, vm.AreaId, vm.Archivo!);
         TempData["Ok"] = "Documento creado en versión v1.0.0 (BORRADOR).";
         return RedirectToAction(nameof(Details), new { id = docId });
+    }
+
+    // Si el usuario está limitado por área, el área queda fija (no elige); si no, carga el desplegable.
+    private async Task PrepararAreaCreate(DocumentoCreateViewModel vm)
+    {
+        if (_tenant.RestringidoPorArea && _tenant.AreaId is not null)
+        {
+            vm.AreaId = _tenant.AreaId.Value;
+            ViewBag.AreaFija = await _db.Areas.Where(a => a.Id == _tenant.AreaId).Select(a => a.Nombre).FirstOrDefaultAsync();
+        }
+        else
+        {
+            vm.Areas = await AreasSelect(vm.AreaId == 0 ? null : vm.AreaId);
+        }
     }
 
     [Authorize(Roles = PuedeEditar)]
@@ -123,9 +147,7 @@ public class DocumentosController : Controller
         {
             Id = doc.Id,
             Titulo = doc.Titulo,
-            Descripcion = doc.Descripcion,
-            AreaId = doc.AreaId,
-            Areas = await AreasSelect(doc.AreaId)
+            Descripcion = doc.Descripcion
         });
     }
 
@@ -134,8 +156,8 @@ public class DocumentosController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(DocumentoEditViewModel vm)
     {
-        if (!ModelState.IsValid) { vm.Areas = await AreasSelect(vm.AreaId); return View(vm); }
-        await _docs.EditarAsync(vm.Id, vm.Titulo, vm.Descripcion, vm.AreaId);
+        if (!ModelState.IsValid) return View(vm);
+        await _docs.EditarAsync(vm.Id, vm.Titulo, vm.Descripcion);
         TempData["Ok"] = "Documento actualizado.";
         return RedirectToAction(nameof(Details), new { id = vm.Id });
     }
@@ -199,9 +221,9 @@ public class DocumentosController : Controller
     [Authorize(Roles = PuedeAprobar)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Rechazar(int versionId, int documentoId, string tipoRechazo, string? comentario)
+    public async Task<IActionResult> Rechazar(int versionId, int documentoId, string? comentario)
     {
-        try { await _docs.RechazarAsync(versionId, tipoRechazo, comentario); TempData["Ok"] = "Documento rechazado; se generó una nueva versión BORRADOR."; }
+        try { await _docs.RechazarAsync(versionId, comentario); TempData["Ok"] = "Documento rechazado."; }
         catch (Exception ex) { TempData["Error"] = ex.Message; }
         return RedirectToAction(nameof(Details), new { id = documentoId });
     }
@@ -223,6 +245,43 @@ public class DocumentosController : Controller
             HttpContext.Connection.RemoteIpAddress?.ToString());
 
         return File(file.Value.Stream, "application/octet-stream", file.Value.Nombre);
+    }
+
+    // Vista previa EN LÍNEA (no fuerza descarga). Mismas reglas de acceso que Download.
+    public async Task<IActionResult> Ver(int versionId)
+    {
+        var v = await _docs.ObtenerVersionAsync(versionId);
+        if (v is null || v.RutaArchivo is null) return NotFound();
+
+        // El Lector solo puede ver la versión vigente.
+        if (_tenant.Nivel >= Roles.Nivel[Roles.Lector] && !v.EsVigente)
+            return Forbid();
+
+        var file = _storage.Abrir(v.RutaArchivo, v.NombreArchivo ?? "archivo");
+        if (file is null) return NotFound();
+
+        await _audit.LogAccesoAsync(_tenant.EmpresaId, _tenant.UsuarioId ?? 0, _tenant.Email ?? "",
+            v.DocumentoId, v.Id, v.VersionTag, "VISUALIZADO",
+            HttpContext.Connection.RemoteIpAddress?.ToString());
+
+        // Sin nombre de archivo => Content-Disposition inline => el navegador lo muestra.
+        return File(file.Value.Stream, TipoContenido(v.NombreArchivo));
+    }
+
+    private static string TipoContenido(string? nombre)
+    {
+        var ext = System.IO.Path.GetExtension(nombre ?? "").ToLowerInvariant();
+        return ext switch
+        {
+            ".pdf"  => "application/pdf",
+            ".png"  => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".gif"  => "image/gif",
+            ".webp" => "image/webp",
+            ".svg"  => "image/svg+xml",
+            ".txt"  => "text/plain; charset=utf-8",
+            _        => "application/octet-stream"
+        };
     }
 
     // Metadatos en vivo: los pide al microservicio Node (que los tiene en MongoDB).

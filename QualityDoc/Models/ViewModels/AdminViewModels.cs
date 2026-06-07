@@ -24,7 +24,10 @@ public class UsuarioCreateViewModel
     [Required, EmailAddress] public string Email { get; set; } = string.Empty;
     [Required, MinLength(8), DataType(DataType.Password)] public string Password { get; set; } = string.Empty;
     [Required, Display(Name = "Rol")] public int RolId { get; set; }
+
+    [Display(Name = "Área")] public int? AreaId { get; set; }   // requerida para Lector/Creador/Revisor
     public IEnumerable<SelectListItem> Roles { get; set; } = new List<SelectListItem>();
+    public IEnumerable<SelectListItem> Areas { get; set; } = new List<SelectListItem>();
 }
 
 public class AreaCreateViewModel

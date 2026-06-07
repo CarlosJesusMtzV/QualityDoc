@@ -5,6 +5,7 @@ public class Usuario
     public int Id { get; set; }
     public int EmpresaId { get; set; }
     public int RolId { get; set; }
+    public int? AreaId { get; set; }   // área del usuario (Lector/Creador/Revisor); null para Admin/SuperAdmin
 
     public string Email { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
@@ -16,6 +17,7 @@ public class Usuario
 
     public Empresa? Empresa { get; set; }
     public Rol? Rol { get; set; }
+    public Area? Area { get; set; }
 
     public string NombreCompleto => string.IsNullOrWhiteSpace(Apellido) ? Nombre : $"{Nombre} {Apellido}";
 }

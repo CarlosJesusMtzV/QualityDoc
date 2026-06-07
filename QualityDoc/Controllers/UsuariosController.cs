@@ -23,12 +23,12 @@ public class UsuariosController : Controller
     }
 
     public async Task<IActionResult> Index() =>
-        View(await _db.Usuarios.Include(u => u.Rol).Include(u => u.Empresa)
+        View(await _db.Usuarios.Include(u => u.Rol).Include(u => u.Empresa).Include(u => u.Area)
             .OrderBy(u => u.Email).ToListAsync());
 
     [HttpGet]
     public async Task<IActionResult> Create() =>
-        View(new UsuarioCreateViewModel { Roles = await RolesSelect() });
+        View(new UsuarioCreateViewModel { Roles = await RolesSelect(), Areas = await AreasSelect() });
 
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -36,12 +36,20 @@ public class UsuariosController : Controller
     {
         if (await _db.Usuarios.IgnoreQueryFilters().AnyAsync(u => u.Email == vm.Email))
             ModelState.AddModelError(nameof(vm.Email), "Ya existe un usuario con ese correo.");
-        if (!ModelState.IsValid) { vm.Roles = await RolesSelect(); return View(vm); }
+
+        // El rol decide si necesita área (Revisor/Creador/Lector) o no (Admin).
+        var rol = await _db.Roles.FirstOrDefaultAsync(r => r.Id == vm.RolId);
+        bool requiereArea = rol != null && rol.Nivel >= Roles.Nivel[Roles.Revisor];
+        if (requiereArea && (vm.AreaId is null || vm.AreaId == 0))
+            ModelState.AddModelError(nameof(vm.AreaId), "Este rol debe pertenecer a un área.");
+
+        if (!ModelState.IsValid) { vm.Roles = await RolesSelect(); vm.Areas = await AreasSelect(); return View(vm); }
 
         _db.Usuarios.Add(new Usuario
         {
             EmpresaId = _tenant.EmpresaId,
             RolId = vm.RolId,
+            AreaId = requiereArea ? vm.AreaId : null,   // Admin no lleva área
             Email = vm.Email,
             Nombre = vm.Nombre,
             Apellido = vm.Apellido,
@@ -87,4 +95,9 @@ public class UsuariosController : Controller
             .Select(r => new SelectListItem { Value = r.Id.ToString(), Text = r.Nombre })
             .ToListAsync();
     }
+
+    private async Task<List<SelectListItem>> AreasSelect() =>
+        await _db.Areas.OrderBy(a => a.Nombre)
+            .Select(a => new SelectListItem { Value = a.Id.ToString(), Text = a.Nombre })
+            .ToListAsync();
 }

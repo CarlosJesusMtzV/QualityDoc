@@ -7,8 +7,8 @@ public interface IDocumentService
     /// <summary>Crea un documento con su versión inicial v1.0.0 (BORRADOR).</summary>
     Task<int> CrearAsync(string titulo, string? descripcion, int areaId, IFormFile archivo);
 
-    /// <summary>Edita los datos del documento (título, descripción, área).</summary>
-    Task EditarAsync(int documentoId, string titulo, string? descripcion, int areaId);
+    /// <summary>Edita SOLO los datos del documento (título y descripción). El área no cambia.</summary>
+    Task EditarAsync(int documentoId, string titulo, string? descripcion);
 
     /// <summary>Baja lógica del documento (deja de aparecer en listados).</summary>
     Task EliminarAsync(int documentoId);
@@ -21,10 +21,10 @@ public interface IDocumentService
 
     Task EnviarARevisionAsync(int versionId);
     Task AprobarAsync(int versionId, string? comentario);
-    Task RechazarAsync(int versionId, string tipoRechazo, string? comentario);
+    Task RechazarAsync(int versionId, string? comentario);
 
-    /// <summary>Listado principal paginado: última versión (o vigente para Lector) por documento, con filtros.</summary>
-    Task<(List<DocumentoVersion> Items, int Total)> ListarAsync(int? areaId, string? tipo, bool soloVigentes, int page, int pageSize);
+    /// <summary>Listado paginado. vista = "vigentes" (solo vigentes) | "proceso" (borradores y en revisión).</summary>
+    Task<(List<DocumentoVersion> Items, int Total)> ListarAsync(int? areaId, string? tipo, string vista, int page, int pageSize);
 
     /// <summary>Trae versiones por sus Ids (usado por la búsqueda full-text de MongoDB).</summary>
     Task<List<DocumentoVersion>> ListarPorIdsAsync(IEnumerable<int> versionIds, bool soloVigentes);
