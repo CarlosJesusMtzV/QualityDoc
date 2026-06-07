@@ -17,8 +17,12 @@
             </div>
             <div class="col-md-6">
                 <label class="form-label">Correo</label>
-                <input asp-for="Email" class="form-control" />
+                <div class="input-group">
+                    <input asp-for="Email" class="form-control" autocomplete="off" placeholder="se autocompleta con el nombre" />
+                    <button type="button" class="btn btn-outline-secondary" id="btnSugerir" title="Sugerir correo"><i class="bi bi-magic"></i></button>
+                </div>
                 <span asp-validation-for="Email" class="text-danger small"></span>
+                <div id="emailFeedback" class="form-text"></div>
             </div>
             <div class="col-md-6">
                 <label class="form-label">Contraseña</label>
@@ -46,3 +50,63 @@
         </div>
     </form>
 </div></div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const nombre = document.getElementById('Nombre');
+            const apellido = document.getElementById('Apellido');
+            const email = document.getElementById('Email');
+            const fb = document.getElementById('emailFeedback');
+            const btn = document.getElementById('btnSugerir');
+            let editadoManual = email.value.trim() !== '';   // si ya venía con valor, respétalo
+
+            const sugerirUrl = '@Url.Action("SugerirCorreo", "Usuarios")';
+            const dispUrl = '@Url.Action("CorreoDisponible", "Usuarios")';
+
+            function setFb(txt, cls) {
+                fb.textContent = txt;
+                fb.className = 'form-text ' + (cls || '');
+            }
+            email.classList.remove('is-valid', 'is-invalid');
+
+            // Marca como editado manualmente si el admin escribe en el correo
+            email.addEventListener('input', () => { editadoManual = true; verificar(); });
+
+            async function sugerir(forzar) {
+                if (editadoManual && !forzar) return;
+                const params = new URLSearchParams({ nombre: nombre.value || '', apellido: apellido.value || '' });
+                try {
+                    const r = await fetch(sugerirUrl + '?' + params.toString());
+                    const d = await r.json();
+                    if (d.correo) {
+                        email.value = d.correo;
+                        if (forzar) editadoManual = false;
+                        verificar();
+                    }
+                } catch { /* sin conexión: se ignora */ }
+            }
+
+            let t;
+            async function verificar() {
+                clearTimeout(t);
+                const val = email.value.trim();
+                email.classList.remove('is-valid', 'is-invalid');
+                if (!val) { setFb('', ''); return; }
+                t = setTimeout(async () => {
+                    try {
+                        const r = await fetch(dispUrl + '?' + new URLSearchParams({ email: val }).toString());
+                        const d = await r.json();
+                        if (!d.valido) { setFb('Formato de correo no válido.', 'text-danger'); email.classList.add('is-invalid'); }
+                        else if (d.disponible) { setFb('Correo disponible.', 'text-success'); email.classList.add('is-valid'); }
+                        else { setFb('Ese correo ya está en uso, prueba otro.', 'text-danger'); email.classList.add('is-invalid'); }
+                    } catch { setFb('', ''); }
+                }, 300);
+            }
+
+            nombre.addEventListener('blur', () => sugerir(false));
+            apellido.addEventListener('blur', () => sugerir(false));
+            btn.addEventListener('click', () => sugerir(true));   // el botón siempre re-sugiere
+        })();
+    </script>
+}

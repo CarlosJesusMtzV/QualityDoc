@@ -64,6 +64,62 @@ public class UsuariosController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    // Sugiere un correo único a partir del nombre/apellido y el dominio de la empresa.
+    [HttpGet]
+    public async Task<IActionResult> SugerirCorreo(string? nombre, string? apellido)
+    {
+        var dominio = Dominio();
+        var baseUser = ConstruirUsuario(nombre, apellido);
+        if (string.IsNullOrEmpty(baseUser))
+            return Json(new { correo = "", dominio });
+
+        var correo = $"{baseUser}@{dominio}";
+        int n = 1;
+        while (await _db.Usuarios.IgnoreQueryFilters().AnyAsync(u => u.Email == correo))
+        {
+            n++;
+            correo = $"{baseUser}{n}@{dominio}";
+        }
+        return Json(new { correo, dominio });
+    }
+
+    // Comprueba en vivo si un correo es válido y está disponible.
+    [HttpGet]
+    public async Task<IActionResult> CorreoDisponible(string? email)
+    {
+        email = (email ?? "").Trim().ToLowerInvariant();
+        bool valido = System.Text.RegularExpressions.Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$");
+        bool existe = valido && await _db.Usuarios.IgnoreQueryFilters().AnyAsync(u => u.Email == email);
+        return Json(new { valido, disponible = valido && !existe });
+    }
+
+    private string Dominio()
+    {
+        var slug = _tenant.EmpresaSlug;
+        return string.IsNullOrWhiteSpace(slug) ? "empresa.com" : $"{slug}.com";
+    }
+
+    // "Juan Carlos" + "Pérez García" => "juan.perez"
+    private static string ConstruirUsuario(string? nombre, string? apellido)
+    {
+        static string PrimerToken(string? s)
+        {
+            s = Ascii((s ?? "").Trim().ToLowerInvariant());
+            var first = s.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+            return new string(first.Where(char.IsLetterOrDigit).ToArray());
+        }
+        var n = PrimerToken(nombre);
+        var a = PrimerToken(apellido);
+        if (n == "" && a == "") return "";
+        if (a == "") return n;
+        if (n == "") return a;
+        return $"{n}.{a}";
+    }
+
+    private static string Ascii(string s) => s
+        .Replace('á', 'a').Replace('é', 'e').Replace('í', 'i').Replace('ó', 'o').Replace('ú', 'u').Replace('ü', 'u')
+        .Replace('ñ', 'n');
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Toggle(int id)
