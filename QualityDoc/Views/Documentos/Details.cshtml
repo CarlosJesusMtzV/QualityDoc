@@ -7,8 +7,9 @@
     var enProceso = versiones.FirstOrDefault(v => v.Estado == "BORRADOR" || v.Estado == "EN_REVISION");
     var vigente = versiones.FirstOrDefault(v => v.EsVigente);
     var latest = enProceso ?? vigente;
-    bool puedeEditar  = User.IsInRole("SUPERADMIN") || User.IsInRole("ADMIN") || User.IsInRole("REVISOR") || User.IsInRole("CREADOR");
-    bool puedeAprobar = User.IsInRole("SUPERADMIN") || User.IsInRole("ADMIN") || User.IsInRole("REVISOR");
+    bool puedeEditar  = User.IsInRole("SUPERADMIN") || User.IsInRole("ADMIN") || User.IsInRole("AUTORIZADOR") || User.IsInRole("REVISOR") || User.IsInRole("CREADOR");
+    bool puedeAprobar = User.IsInRole("SUPERADMIN") || User.IsInRole("ADMIN") || User.IsInRole("AUTORIZADOR");
+    bool puedeEnviar  = User.IsInRole("SUPERADMIN") || User.IsInRole("ADMIN") || User.IsInRole("AUTORIZADOR") || User.IsInRole("REVISOR"); // el Creador NO manda a revisión
     bool esLector = !puedeEditar; // el Lector solo ve/descarga/previsualiza la versión vigente
 }
 @functions {
@@ -76,7 +77,7 @@
             }
         </div>
         <div class="card-body">
-            @if (latest.Estado == "BORRADOR" && puedeEditar)
+            @if (latest.Estado == "BORRADOR" && puedeEnviar)
             {
                 <p class="text-muted small mb-2">Esta versión está en BORRADOR con su archivo cargado. Cuando esté lista, envíala a revisión.</p>
                 <form asp-action="EnviarRevision" method="post" onsubmit="return confirm('¿Enviar a revisión?');">
@@ -84,6 +85,10 @@
                     <input type="hidden" name="documentoId" value="@Model.Id" />
                     <button class="btn btn-warning"><i class="bi bi-send"></i> Enviar a revisión</button>
                 </form>
+            }
+            else if (latest.Estado == "BORRADOR" && puedeEditar)
+            {
+                <p class="text-muted small mb-0"><i class="bi bi-info-circle"></i> Documento en BORRADOR. Un <strong>Revisor</strong> debe enviarlo a revisión.</p>
             }
             else if (latest.Estado == "EN_REVISION" && puedeAprobar)
             {
@@ -358,8 +363,10 @@ else if (puedeEditar)
                     for (const k in (d.metadatos || {})) {
                         rows += `<tr><th>${k}</th><td>${d.metadatos[k]}</td></tr>`;
                     }
+                    let extra = '';
+                    if (d.etiquetas && d.etiquetas.length) extra += '<div class="mb-2"><span class="text-muted small me-1">Etiquetas:</span>' + d.etiquetas.map(t => `<span class="badge bg-light text-dark border me-1">${t}</span>`).join('') + '</div>';
                     document.getElementById('metaBody').innerHTML =
-                        '<table class="table table-sm table-striped mb-0"><tbody>' + rows + '</tbody></table>';
+                        extra + '<table class="table table-sm table-striped mb-0"><tbody>' + rows + '</tbody></table>';
                     document.getElementById('metaJson').textContent = JSON.stringify(d.metadatos || {}, null, 2);
                 })
                 .catch(() => {

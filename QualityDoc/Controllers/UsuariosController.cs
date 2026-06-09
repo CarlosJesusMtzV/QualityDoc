@@ -39,7 +39,7 @@ public class UsuariosController : Controller
 
         // El rol decide si necesita área (Revisor/Creador/Lector) o no (Admin).
         var rol = await _db.Roles.FirstOrDefaultAsync(r => r.Id == vm.RolId);
-        bool requiereArea = rol != null && rol.Nivel >= Roles.Nivel[Roles.Revisor];
+        bool requiereArea = rol != null && rol.Nivel >= Roles.Nivel[Roles.Autorizador];
         if (requiereArea && (vm.AreaId is null || vm.AreaId == 0))
             ModelState.AddModelError(nameof(vm.AreaId), "Este rol debe pertenecer a un área.");
 
@@ -64,12 +64,13 @@ public class UsuariosController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // Sugiere un correo único a partir del nombre/apellido y el dominio de la empresa.
+    // Sugiere un correo único a partir del nombre/apellido, el código del rol y el dominio de la empresa.
     [HttpGet]
-    public async Task<IActionResult> SugerirCorreo(string? nombre, string? apellido)
+    public async Task<IActionResult> SugerirCorreo(string? nombre, string? apellido, int? rolId)
     {
         var dominio = Dominio();
-        var baseUser = ConstruirUsuario(nombre, apellido);
+        var code = await CodigoRolAsync(rolId);
+        var baseUser = ConstruirUsuario(nombre, apellido, code);
         if (string.IsNullOrEmpty(baseUser))
             return Json(new { correo = "", dominio });
 
@@ -99,8 +100,8 @@ public class UsuariosController : Controller
         return string.IsNullOrWhiteSpace(slug) ? "empresa.com" : $"{slug}.com";
     }
 
-    // "Juan Carlos" + "Pérez García" => "juan.perez"
-    private static string ConstruirUsuario(string? nombre, string? apellido)
+    // "Juan Carlos" + "Pérez García" + "lr" => "juan.perez.lr"
+    private static string ConstruirUsuario(string? nombre, string? apellido, string? code = null)
     {
         static string PrimerToken(string? s)
         {
@@ -110,10 +111,26 @@ public class UsuariosController : Controller
         }
         var n = PrimerToken(nombre);
         var a = PrimerToken(apellido);
-        if (n == "" && a == "") return "";
-        if (a == "") return n;
-        if (n == "") return a;
-        return $"{n}.{a}";
+        string baseUser = (n, a) switch { ("", "") => "", (_, "") => n, ("", _) => a, _ => $"{n}.{a}" };
+        if (baseUser != "" && !string.IsNullOrEmpty(code)) baseUser += $".{code}";
+        return baseUser;
+    }
+
+    // Código corto del rol para anteponerlo al @ (sa, ad, rv, cr, lr).
+    private async Task<string?> CodigoRolAsync(int? rolId)
+    {
+        if (rolId is null) return null;
+        var nombre = await _db.Roles.Where(r => r.Id == rolId).Select(r => r.Nombre).FirstOrDefaultAsync();
+        return nombre switch
+        {
+            Roles.SuperAdmin => "sa",
+            Roles.Admin => "ad",
+            Roles.Autorizador => "az",
+            Roles.Revisor => "rv",
+            Roles.Creador => "cr",
+            Roles.Lector => "lr",
+            _ => null
+        };
     }
 
     private static string Ascii(string s) => s

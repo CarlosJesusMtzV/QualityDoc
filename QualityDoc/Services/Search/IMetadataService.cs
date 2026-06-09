@@ -17,8 +17,20 @@ public interface IMetadataService
     /// <summary>Búsqueda full-text en Node/Mongo; devuelve los Ids de versión que coinciden.</summary>
     Task<List<int>> BuscarVersionIdsAsync(int empresaId, string? q, string? area, bool soloVigentes);
 
+    /// <summary>Búsqueda con fragmento: por cada versión, el trozo de texto donde aparece la palabra, nº de coincidencias y párrafo.</summary>
+    Task<List<SearchHit>> BuscarAsync(int empresaId, string? q, string? area, bool soloVigentes);
+
     /// <summary>JSON crudo de los metadatos de una versión (para mostrar en vivo).</summary>
     Task<string?> ObtenerJsonAsync(int versionId);
+}
+
+/// <summary>Resultado de búsqueda con fragmento para mostrar en la lista.</summary>
+public class SearchHit
+{
+    public int VersionId { get; set; }
+    public string? Snippet { get; set; }
+    public int Coincidencias { get; set; }
+    public int Parrafo { get; set; }
 }
 
 public class IndexPayload
@@ -39,6 +51,11 @@ public class IndexPayload
     [JsonPropertyName("hash_sha256")]    public string? HashSha256 { get; set; }
     [JsonPropertyName("tamanio_bytes")]  public long? TamanioBytes { get; set; }
     [JsonPropertyName("subido_por")]     public string? SubidoPor { get; set; }
+
+    // Opcionales: precargan texto/etiquetas/metadatos en la siembra (evitan re-extraer del archivo).
+    [JsonPropertyName("texto")]          public string? Texto { get; set; }
+    [JsonPropertyName("etiquetas")]      public List<string>? Etiquetas { get; set; }
+    [JsonPropertyName("metadatos")]      public Dictionary<string, string>? Metadatos { get; set; }
 }
 
 public class StatePayload

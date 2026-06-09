@@ -37,7 +37,7 @@
                 <span asp-validation-for="RolId" class="text-danger small"></span>
             </div>
             <div class="col-md-6">
-                <label class="form-label">Área <span class="text-muted small">(obligatoria para Lector/Creador/Revisor)</span></label>
+                <label class="form-label">Área <span class="text-muted small">(obligatoria para Autorizador/Revisor/Creador/Lector)</span></label>
                 <select asp-for="AreaId" asp-items="Model.Areas" class="form-select">
                     <option value="">— Sin área (Admin) —</option>
                 </select>
@@ -56,6 +56,7 @@
         (function () {
             const nombre = document.getElementById('Nombre');
             const apellido = document.getElementById('Apellido');
+            const rol = document.getElementById('RolId');
             const email = document.getElementById('Email');
             const fb = document.getElementById('emailFeedback');
             const btn = document.getElementById('btnSugerir');
@@ -75,7 +76,7 @@
 
             async function sugerir(forzar) {
                 if (editadoManual && !forzar) return;
-                const params = new URLSearchParams({ nombre: nombre.value || '', apellido: apellido.value || '' });
+                const params = new URLSearchParams({ nombre: nombre.value || '', apellido: apellido.value || '', rolId: (rol ? rol.value : '') || '' });
                 try {
                     const r = await fetch(sugerirUrl + '?' + params.toString());
                     const d = await r.json();
@@ -106,6 +107,7 @@
 
             nombre.addEventListener('blur', () => sugerir(false));
             apellido.addEventListener('blur', () => sugerir(false));
+            if (rol) rol.addEventListener('change', () => sugerir(false));   // re-sugiere con el código del rol
             btn.addEventListener('click', () => sugerir(true));   // el botón siempre re-sugiere
         })();
     </script>

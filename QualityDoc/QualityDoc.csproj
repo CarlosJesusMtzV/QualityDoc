@@ -25,4 +25,10 @@
     <PackageReference Include="QuestPDF" Version="2026.5.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Datos demo reales para la siembra (se copian junto al ejecutable).
+         Se usa Update (no Include) porque el SDK ya incluye los .json por defecto. -->
+    <Content Update="Data\seed\documentos_reales.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -3,15 +3,16 @@ namespace QualityDoc.Models.Domain;
 /// <summary>Nombres de rol y su nivel (menor = mas privilegios).</summary>
 public static class Roles
 {
-    public const string SuperAdmin = "SUPERADMIN"; // 0
-    public const string Admin      = "ADMIN";      // 1
-    public const string Revisor    = "REVISOR";    // 2
-    public const string Creador    = "CREADOR";    // 3
-    public const string Lector     = "LECTOR";     // 4
+    public const string SuperAdmin  = "SUPERADMIN";  // 0
+    public const string Admin       = "ADMIN";       // 1
+    public const string Autorizador = "AUTORIZADOR"; // 2 — autoriza (aprueba/rechaza) y además crea/edita
+    public const string Revisor     = "REVISOR";     // 3 — crea/edita y manda a revisión (no autoriza)
+    public const string Creador     = "CREADOR";     // 4
+    public const string Lector      = "LECTOR";      // 5
 
     public static readonly IReadOnlyDictionary<string, int> Nivel = new Dictionary<string, int>
     {
-        [SuperAdmin] = 0, [Admin] = 1, [Revisor] = 2, [Creador] = 3, [Lector] = 4
+        [SuperAdmin] = 0, [Admin] = 1, [Autorizador] = 2, [Revisor] = 3, [Creador] = 4, [Lector] = 5
     };
 }
 

@@ -46,6 +46,33 @@ public class NodeMetadataService : IMetadataService
         return ids;
     }
 
+    public async Task<List<SearchHit>> BuscarAsync(int empresaId, string? q, string? area, bool soloVigentes)
+    {
+        var hits = new List<SearchHit>();
+        try
+        {
+            var url = $"/api/search?empresaId={empresaId}&soloVigentes={(soloVigentes ? "true" : "false")}";
+            if (!string.IsNullOrWhiteSpace(q)) url += $"&q={Uri.EscapeDataString(q)}";
+            if (!string.IsNullOrWhiteSpace(area)) url += $"&area={Uri.EscapeDataString(area)}";
+
+            var docs = await _http.GetFromJsonAsync<List<JsonElement>>(url);
+            if (docs is not null)
+                foreach (var d in docs)
+                {
+                    if (!d.TryGetProperty("version_id", out var vid) || !vid.TryGetInt32(out var id)) continue;
+                    hits.Add(new SearchHit
+                    {
+                        VersionId = id,
+                        Snippet = d.TryGetProperty("snippet", out var s) && s.ValueKind == JsonValueKind.String ? s.GetString() : null,
+                        Coincidencias = d.TryGetProperty("coincidencias", out var c) && c.TryGetInt32(out var cn) ? cn : 0,
+                        Parrafo = d.TryGetProperty("parrafo", out var pr) && pr.TryGetInt32(out var pn) ? pn : 0
+                    });
+                }
+        }
+        catch (Exception e) { _log.LogWarning(e, "Búsqueda con fragmento en Node falló"); }
+        return hits;
+    }
+
     public async Task<string?> ObtenerJsonAsync(int versionId)
     {
         try { return await _http.GetStringAsync($"/api/metadata/{versionId}"); }

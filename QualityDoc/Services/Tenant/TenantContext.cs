@@ -28,8 +28,8 @@ public class TenantContext : ITenantContext
         get { var raw = User?.FindFirst("area_id")?.Value; return int.TryParse(raw, out var v) && v > 0 ? v : null; }
     }
 
-    // Revisor(2), Creador(3), Lector(4) quedan limitados a su área. Admin(1)/SuperAdmin(0) no.
-    public bool RestringidoPorArea => Nivel >= Roles.Nivel[Roles.Revisor];
+    // Autorizador(2), Revisor(3), Creador(4), Lector(5) quedan limitados a su área. Admin(1)/SuperAdmin(0) no.
+    public bool RestringidoPorArea => Nivel >= Roles.Nivel[Roles.Autorizador];
 
     public int EmpresaId => SuperOverride()?.Id ?? GetInt("empresa_id");
     public string? EmpresaSlug => SuperOverride()?.Slug ?? User?.FindFirst("empresa_slug")?.Value;

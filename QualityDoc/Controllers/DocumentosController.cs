@@ -17,8 +17,9 @@ namespace QualityDoc.Controllers;
 [Authorize]
 public class DocumentosController : Controller
 {
-    private const string PuedeEditar  = "SUPERADMIN,ADMIN,REVISOR,CREADOR";
-    private const string PuedeAprobar = "SUPERADMIN,ADMIN,REVISOR";
+    private const string PuedeEditar         = "SUPERADMIN,ADMIN,AUTORIZADOR,REVISOR,CREADOR";
+    private const string PuedeEnviarRevision = "SUPERADMIN,ADMIN,AUTORIZADOR,REVISOR"; // el Creador NO manda a revisión
+    private const string PuedeAprobar        = "SUPERADMIN,ADMIN,AUTORIZADOR";
 
     private const int PageSize = 10;
 
@@ -58,13 +59,17 @@ public class DocumentosController : Controller
             var areaNombre = areaId is null ? null
                 : await _db.Areas.Where(a => a.Id == areaId).Select(a => a.Nombre).FirstOrDefaultAsync();
 
-            var ids = await _meta.BuscarVersionIdsAsync(_tenant.EmpresaId, q, areaNombre, soloVigentes);
+            var hits = await _meta.BuscarAsync(_tenant.EmpresaId, q, areaNombre, soloVigentes);
+            var ids = hits.Select(h => h.VersionId).ToList();
             var encontrados = await _docs.ListarPorIdsAsync(ids, soloVigentes);
             if (!string.IsNullOrWhiteSpace(tipo))
                 encontrados = encontrados.Where(v => v.TipoArchivo == tipo).ToList();
 
             total = encontrados.Count;
             items = encontrados.Skip((page - 1) * PageSize).Take(PageSize).ToList();
+            ViewBag.Snippets = hits
+                .GroupBy(h => h.VersionId).Select(g => g.First())
+                .ToDictionary(h => h.VersionId);
         }
         else
         {
@@ -198,7 +203,7 @@ public class DocumentosController : Controller
         return RedirectToAction(nameof(Details), new { id = documentoId });
     }
 
-    [Authorize(Roles = PuedeEditar)]
+    [Authorize(Roles = PuedeEnviarRevision)]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> EnviarRevision(int versionId, int documentoId)
@@ -292,6 +297,7 @@ public class DocumentosController : Controller
 
         var metadatos = new Dictionary<string, string>();
         string? nginxUrl = null;
+        var etiquetas = new List<string>();
 
         var json = await _meta.ObtenerJsonAsync(versionId);
         if (json is not null)
@@ -305,6 +311,9 @@ public class DocumentosController : Controller
                         metadatos[prop.Name] = prop.Value.ToString();
                 if (root.TryGetProperty("nginx_url", out var nu) && nu.ValueKind == System.Text.Json.JsonValueKind.String)
                     nginxUrl = nu.GetString();
+                if (root.TryGetProperty("etiquetas", out var et) && et.ValueKind == System.Text.Json.JsonValueKind.Array)
+                    foreach (var e in et.EnumerateArray())
+                        if (e.ValueKind == System.Text.Json.JsonValueKind.String) etiquetas.Add(e.GetString()!);
             }
             catch { /* JSON inesperado: devolvemos lo básico */ }
         }
@@ -317,6 +326,7 @@ public class DocumentosController : Controller
             tamanioBytes = v.TamanioBytes,
             estado = v.Estado,
             nginxUrl,
+            etiquetas,
             metadatos
         });
     }

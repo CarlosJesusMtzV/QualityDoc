@@ -42,11 +42,12 @@ public class CoreDbContext : DbContext
             e.HasIndex(x => x.Nombre).IsUnique();
             e.Property(x => x.Nombre).HasMaxLength(50);
             e.HasData(
-                new Rol { Id = 1, Nombre = RoleNames.SuperAdmin, Nivel = 0 },
-                new Rol { Id = 2, Nombre = RoleNames.Admin,      Nivel = 1 },
-                new Rol { Id = 3, Nombre = RoleNames.Revisor,    Nivel = 2 },
-                new Rol { Id = 4, Nombre = RoleNames.Creador,    Nivel = 3 },
-                new Rol { Id = 5, Nombre = RoleNames.Lector,     Nivel = 4 });
+                new Rol { Id = 1, Nombre = RoleNames.SuperAdmin,  Nivel = 0 },
+                new Rol { Id = 2, Nombre = RoleNames.Admin,       Nivel = 1 },
+                new Rol { Id = 3, Nombre = RoleNames.Revisor,     Nivel = 3 },
+                new Rol { Id = 4, Nombre = RoleNames.Creador,     Nivel = 4 },
+                new Rol { Id = 5, Nombre = RoleNames.Lector,      Nivel = 5 },
+                new Rol { Id = 6, Nombre = RoleNames.Autorizador, Nivel = 2 });
         });
 
         // ── Usuario ──

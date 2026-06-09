@@ -10,7 +10,8 @@
     int totalPages = ViewBag.TotalPages ?? 1;
     var vista = ViewBag.Vista as string ?? "vigentes";
     bool esLector = ViewBag.EsLector == true;
-    bool puedeEditar = User.IsInRole("SUPERADMIN") || User.IsInRole("ADMIN") || User.IsInRole("REVISOR") || User.IsInRole("CREADOR");
+    bool puedeEditar = User.IsInRole("SUPERADMIN") || User.IsInRole("ADMIN") || User.IsInRole("AUTORIZADOR") || User.IsInRole("REVISOR") || User.IsInRole("CREADOR");
+    var snippets = ViewBag.Snippets as Dictionary<int, QualityDoc.Services.Search.SearchHit>;
 }
 @functions {
     static string Badge(string estado) => estado switch
@@ -22,6 +23,20 @@
         "OBSOLETO" => "dark",
         _ => "light text-dark"
     };
+
+    // Resalta el término buscado dentro del fragmento (escapando HTML).
+    static Microsoft.AspNetCore.Html.IHtmlContent Resaltar(string? texto, string? termino)
+    {
+        if (string.IsNullOrEmpty(texto)) return new Microsoft.AspNetCore.Html.HtmlString("");
+        var enc = System.Net.WebUtility.HtmlEncode(texto);
+        if (!string.IsNullOrWhiteSpace(termino))
+        {
+            var pat = System.Text.RegularExpressions.Regex.Escape(System.Net.WebUtility.HtmlEncode(termino));
+            enc = System.Text.RegularExpressions.Regex.Replace(enc, pat, m => $"<mark>{m.Value}</mark>",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+        return new Microsoft.AspNetCore.Html.HtmlString(enc);
+    }
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -53,7 +68,7 @@
     <div class="col-md-4">
         <div class="input-group">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
-            <input name="q" value="@q" class="form-control" placeholder="Buscar (título, etiquetas…) — MongoDB" />
+            <input name="q" value="@q" class="form-control" placeholder="Buscar palabra en contenido y metadatos — MongoDB" />
         </div>
     </div>
     <div class="col-md-3">
@@ -119,6 +134,23 @@ else
                     }
                 </td>
             </tr>
+            @if (snippets != null && snippets.TryGetValue(v.Id, out var hit) && !string.IsNullOrEmpty(hit.Snippet))
+            {
+                <tr class="table-light">
+                    <td colspan="7" class="small py-2">
+                        <i class="bi bi-search text-muted me-1"></i>
+                        <span class="fst-italic">@Resaltar(hit.Snippet, q)</span>
+                        @if (hit.Coincidencias > 0)
+                        {
+                            <span class="badge bg-secondary ms-2">@hit.Coincidencias coincidencia@(hit.Coincidencias == 1 ? "" : "s")</span>
+                        }
+                        @if (hit.Parrafo > 0)
+                        {
+                            <span class="text-muted ms-1">· párrafo @hit.Parrafo</span>
+                        }
+                    </td>
+                </tr>
+            }
         }
         </tbody>
     </table>
