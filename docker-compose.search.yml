@@ -1,0 +1,63 @@
+# ============================================================
+#  Grupo 2 — Búsqueda + base de datos NoSQL
+#  node-search (Node.js/TypeScript) · mongo (MongoDB)
+#  Node es el ÚNICO dueño de MongoDB: indexa metadatos y resuelve la búsqueda.
+# ============================================================
+
+networks:
+  qd_net:
+    driver: bridge
+
+volumes:
+  mongo_data:
+
+services:
+
+  # ── MongoDB — metadatos ────────────────────────────────────
+  mongo:
+    image: mongo:7.0
+    container_name: qd_mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB}
+    ports:
+      - "27018:27017"   # host 27018 -> contenedor 27017 (evita choque con un Mongo local)
+    volumes:
+      - mongo_data:/data/db
+      # La app crea la coleccion e indices al arrancar (idempotente).
+      # El script db/mongodb/01_init.js es referencia/entregable de la rubrica.
+    networks:
+      - qd_net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Node.js — Microservicio de indexacion y busqueda ───────
+  #  Recibe la notificacion de .NET (HTTP 202), extrae metadatos en
+  #  segundo plano y los guarda como JSON en MongoDB. Expone /search.
+  node-search:
+    build:
+      context: ./node-search
+      dockerfile: Dockerfile
+    container_name: qd_node
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      MONGO_URI: "mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/?authSource=admin"
+      MONGO_DB: ${MONGO_DB}
+      NODE_API_KEY: ${NODE_API_KEY}
+      STORAGE_PATH: /data/files
+    volumes:
+      - ./storage:/data/files:ro   # lee los archivos que escribe .NET
+    networks:
+      - qd_net
+    depends_on:
+      mongo:
+        condition: service_healthy

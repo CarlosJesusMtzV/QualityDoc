@@ -1,0 +1,17 @@
+name: qualitydoc
+
+# ============================================================
+#  QualityDoc — Orquestación dividida en 3 archivos por afinidad:
+#    docker-compose.app.yml     -> .NET (web) + SQL Server + PostgreSQL
+#    docker-compose.search.yml  -> Node (búsqueda) + MongoDB
+#    docker-compose.portal.yml  -> PHP (portal) + Nginx (gateway)
+#
+#  Se combinan con 'include', así que TODO sigue funcionando con un solo
+#  comando:   docker compose up -d   (requiere Docker Compose v2.20 o superior).
+#  Comparten la misma red 'qd_net' y las variables del archivo .env.
+# ============================================================
+
+include:
+  - docker-compose.app.yml
+  - docker-compose.search.yml
+  - docker-compose.portal.yml

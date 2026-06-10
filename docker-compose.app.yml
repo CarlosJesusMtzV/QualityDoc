@@ -1,0 +1,91 @@
+# ============================================================
+#  Grupo 1 — Núcleo .NET + bases de datos relacionales
+#  web (.NET MVC) · sqlserver (SQL Server) · postgres (PostgreSQL)
+#  El módulo .NET es el dueño de SQL Server y el que escribe la auditoría en Postgres.
+# ============================================================
+
+networks:
+  qd_net:
+    driver: bridge
+
+volumes:
+  sql_data:
+  pg_data:
+
+services:
+
+  # ── App MVC (todo el sistema) ──────────────────────────────
+  web:
+    build:
+      context: ./QualityDoc
+      dockerfile: QualityDoc/Dockerfile
+    container_name: qd_web
+    restart: unless-stopped
+    # Sin puerto publicado: el acceso es por Nginx (gateway). Interno en 8080.
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Core: "Server=sqlserver,1433;Database=${SQL_DB};User Id=sa;Password=${SQL_SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=True"
+      ConnectionStrings__Audit: "Host=postgres;Port=5432;Database=${PG_DB};Username=${PG_USER};Password=${PG_PASSWORD}"
+      Services__NodeUrl: http://node-search:3000
+      Services__NodeApiKey: ${NODE_API_KEY}
+      Storage__Path: /app/storage
+      Files__NginxBaseUrl: ${NGINX_FILES_URL:-http://localhost:8081/files}
+      Seed__AdminPassword: ${SEED_PASSWORD}
+    volumes:
+      - ./storage:/app/storage
+    networks:
+      - qd_net
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      node-search:
+        condition: service_started
+
+  # ── SQL Server — nucleo ────────────────────────────────────
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: qd_sqlserver
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SQL_SA_PASSWORD}
+      MSSQL_PID: Developer
+    ports:
+      - "1450:1433"   # host 1450 -> contenedor 1433 (evita choque con un SQL local en 1433)
+    volumes:
+      - sql_data:/var/opt/mssql
+    networks:
+      - qd_net
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools18/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "${SQL_SA_PASSWORD}", "-C", "-Q", "SELECT 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 45s
+
+  # ── PostgreSQL — auditoria ─────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: qd_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_DB: ${PG_DB}
+    ports:
+      - "5440:5432"   # host 5440 -> contenedor 5432 (evita choque con un Postgres local)
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      # El esquema lo crea EF Core (AuditDbContext.Database.Migrate) al arrancar la app.
+      # Los scripts en db/postgres/ son referencia/entregable de la rubrica.
+    networks:
+      - qd_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER} -d ${PG_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
