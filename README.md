@@ -11,7 +11,6 @@ Cada módulo es independiente y dueño de su propia base de datos; se integran e
 | Documento | Archivo |
 |---|---|
 | Documentación técnica y funcional completa | `docs/QualityDoc-Documentacion.docx` · `docs/QualityDoc-Documentacion.pdf` |
-| Guion de defensa (qué decir + preguntas frecuentes) | `docs/QualityDoc-Guion-Defensa.docx` · `docs/QualityDoc-Guion-Defensa.pdf` |
 | Presentación | `docs/QualityDoc-Presentacion.pptx` |
 | Diagramas UML (casos de uso, clases, secuencia, despliegue) | `docs/uml/` |
 | Diseño y reglas de desarrollo | `docs/DISENO.md` · `AGENTS.md` |
